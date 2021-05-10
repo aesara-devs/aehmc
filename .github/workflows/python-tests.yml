@@ -1,0 +1,72 @@
+name: aesara-hmc
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  changes:
+    name: "Check for changes"
+    runs-on: ubuntu-latest
+    outputs:
+      changes: ${{ steps.changes.outputs.src }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            python: &python
+            - 'aesara_hmc/*.py'
+            - 'tests/*.py'
+            - '*.py'
+            src:
+            - *python
+            - '.github/**/*.yml'
+            - 'setup.cfg'
+            - 'requirements.txt'
+            - '.coveragerc'
+            - '.pre-commit-config.yaml'
+
+  style:
+    name: Check code style
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - uses: pre-commit/action@v2.0.0
+
+  python-tests:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.7]
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    - name: Test with pytest
+      run: |
+        pytest tests --cov=aesara_hmc --cov-report=xml:./coverage.xml
+    - name: Fetch main for coverage diff
+      run: |
+        git fetch --no-tags --prune origin main
+    - name: Check coverage
+      run: |
+        diff-cover ./coverage.xml --compare-branch=origin/main --fail-under=100 --diff-range-notation '..'
