@@ -18,10 +18,13 @@ def velocity_verlet(
     a2 = 1 - 2 * a1
 
     def one_step(
-        state: IntegratorStateType,
+        position: TensorVariable,
+        momentum: TensorVariable,
+        potential_energy: TensorVariable,
+        potential_energy_grad: TensorVariable,
         step_size: TensorVariable,
     ) -> IntegratorStateType:
-        position, momentum, potential_energy, potential_energy_grad = state
+        # position, momentum, _, potential_energy_grad = state
 
         new_momentum = momentum - b1 * step_size * potential_energy_grad
 
