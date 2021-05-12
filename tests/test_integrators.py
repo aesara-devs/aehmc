@@ -1,7 +1,7 @@
-import pytest
 import aesara
 import aesara.tensor as aet
 import numpy as np
+import pytest
 from aesara.tensor.var import TensorVariable
 
 from aesara_hmc.integrators import velocity_verlet
@@ -53,7 +53,7 @@ integration_examples = [
 ]
 
 
-def integrate_fn(potential, step_fn, n_steps):
+def create_integrate_fn(potential, step_fn, n_steps):
     q = aet.vector("q")
     p = aet.vector("p")
     step_size = aet.scalar("step_size")
@@ -61,13 +61,17 @@ def integrate_fn(potential, step_fn, n_steps):
     energy_grad = aesara.grad(energy, q)
     trajectory, _ = aesara.scan(
         fn=step_fn,
-        outputs_info=[q, p, energy, energy_grad],
-        non_sequences=step_size,
+        outputs_info=[
+            {"initial": q},
+            {"initial": p},
+            {"initial": energy},
+            {"initial": energy_grad},
+        ],
+        non_sequences=[step_size],
         n_steps=n_steps,
     )
-    final_state = (q, p, energy)
-    integrate = aesara.function(outputs=final_state, inputs=(q, p, step_size))
-    return integrate
+    integrate_fn = aesara.function((q, p, step_size), trajectory)
+    return integrate_fn
 
 
 @pytest.mark.parametrize("example", integration_examples)
@@ -83,10 +87,18 @@ def test_velocity_verlet(example):
     potential, kinetic_energy = model(inverse_mass_matrix)
     step = velocity_verlet(potential, kinetic_energy)
 
-    integrate = integrate_fn(potential, step, example["n_steps"])
-    q_final, p_final, energy_final, _ = integrate(q_init, p_init, step_size)
+    q = aet.vector("q")
+    p = aet.vector("p")
+    # XXX: Should this be a matrix/column vector?
+    p_final = aet.vector("p_final")
+    energy_at = potential(q) + kinetic_energy(p)
+    energy_new_energy_fn = aesara.function(
+        (q, p, p_final), (energy_at, energy_at + kinetic_energy(p_final))
+    )
+
+    integrate_fn = create_integrate_fn(potential, step, example["n_steps"])
+    q_final, p_final, energy_final, _ = integrate_fn(q_init, p_init, step_size)
 
     # Symplectic integrators conserve energy
-    energy = potential(q_init) + kinetic_energy(p_init)
-    new_energy = energy_final + kinetic_energy(p_final)
+    energy, new_energy = energy_new_energy_fn(q_init, p_init, p_final.squeeze())
     assert energy == pytest.approx(new_energy, 1e-3)
