@@ -10,8 +10,9 @@ on:
     types: [published]
 
 jobs:
-  enabled: false
   build:
+    # Disabled
+    if: false
     name: Build source distribution
     runs-on: ubuntu-latest
     steps:
@@ -39,7 +40,9 @@ jobs:
     name: Upload to PyPI on release
     needs: [build]
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' && github.event.action == 'published'
+    # Disabled
+    if: false
+    # if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - uses: actions/download-artifact@v2
         with:
