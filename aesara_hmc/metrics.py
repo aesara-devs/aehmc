@@ -1,10 +1,10 @@
 from typing import Callable, Tuple
 
-import numpy as np
-import scipy.stats
-import scipy.linalg
-from aesara.tensor.var import TensorVariable
 import aesara.tensor as aet
+import numpy as np
+import scipy.linalg
+import scipy.stats
+from aesara.tensor.var import TensorVariable
 
 
 def gaussian_metric(
