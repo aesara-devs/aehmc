@@ -40,8 +40,8 @@ def gaussian_metric(
         momentum_right: TensorVariable,
         momentum_sum: TensorVariable,
     ):
-        velocity_left = aet.dot(inverse_mass_matrix, momentum_left)
-        velocity_right = aet.dot(inverse_mass_matrix, momentum_right)
+        velocity_left = matmul(inverse_mass_matrix, momentum_left)
+        velocity_right = matmul(inverse_mass_matrix, momentum_right)
 
         rho = momentum_sum - (momentum_right + momentum_left) / 2
         turning_at_left = aet.dot(velocity_left, rho) <= 0
