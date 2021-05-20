@@ -62,3 +62,9 @@ def test_turning(inverse_mass_matrix):
     n_dim = inverse_mass_matrix.ndim
     is_turning = is_turning_fn(np.ones(n_dim), np.ones(n_dim), np.ones(n_dim)).item()
     assert is_turning is True
+
+
+def test_fail_wrong_mass_matrix_dimension():
+    inverse_mass_matrix = np.array([[[1, 1], [1, 1]], [[1, 1], [1, 1]]])
+    with pytest.raises(ValueError):
+        _ = gaussian_metric(inverse_mass_matrix)
