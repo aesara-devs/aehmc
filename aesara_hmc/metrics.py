@@ -1,24 +1,22 @@
 from typing import Callable, Tuple
 
 import aesara.tensor as aet
-import numpy as np
-import scipy.linalg
-import scipy.stats
+import aesara.tensor.slinalg as slinalg
 from aesara.tensor.var import TensorVariable
 
 
 def gaussian_metric(
     inverse_mass_matrix: TensorVariable,
 ) -> Tuple[Callable, Callable, Callable]:
-    shape = np.shape(inverse_mass_matrix)[0]
+    shape = aet.shape(inverse_mass_matrix)[0]
 
     if inverse_mass_matrix.ndim == 1:
-        mass_matrix_sqrt = np.sqrt(np.reciprocal(inverse_mass_matrix))
+        mass_matrix_sqrt = aet.sqrt(aet.inv(inverse_mass_matrix))
         dot, matmul = lambda x, y: x * y, lambda x, y: x * y
     elif inverse_mass_matrix.ndim == 2:
-        tril_inv = scipy.linalg.cholesky(inverse_mass_matrix)
-        identity = np.identity(shape)
-        mass_matrix_sqrt = scipy.linalg.solve_triangular(tril_inv, identity, lower=True)
+        tril_inv = slinalg.cholesky(inverse_mass_matrix)
+        identity = aet.eye(shape)
+        mass_matrix_sqrt = slinalg.solve_lower_triangular(tril_inv, identity)
         dot, matmul = aet.dot, aet.dot
     else:
         raise ValueError(
