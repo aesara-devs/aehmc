@@ -2,6 +2,7 @@ from typing import Callable, Tuple
 
 import aesara.tensor as aet
 import aesara.tensor.slinalg as slinalg
+from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
 
 
@@ -23,12 +24,12 @@ def gaussian_metric(
             f"Expected a mass matrix of dimension 1 (diagonal) or 2, got {inverse_mass_matrix.ndim}"
         )
 
-    def momentum_generator(srng):
+    def momentum_generator(srng: RandomStream) -> TensorVariable:
         norm_samples = srng.normal(0, 1, size=shape)
         momentum = dot(norm_samples, mass_matrix_sqrt)
         return momentum
 
-    def kinetic_energy(momentum: TensorVariable):
+    def kinetic_energy(momentum: TensorVariable) -> TensorVariable:
         velocity = matmul(inverse_mass_matrix, momentum)
         kinetic_energy = 0.5 * aet.dot(velocity, momentum)
         return kinetic_energy
@@ -37,7 +38,7 @@ def gaussian_metric(
         momentum_left: TensorVariable,
         momentum_right: TensorVariable,
         momentum_sum: TensorVariable,
-    ):
+    ) -> bool:
         velocity_left = matmul(inverse_mass_matrix, momentum_left)
         velocity_right = matmul(inverse_mass_matrix, momentum_right)
 
