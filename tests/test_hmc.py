@@ -1,62 +1,68 @@
+from typing import Callable
+
 import aesara
 import aesara.tensor as aet
 import numpy as np
+import pytest
 from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
 
 import aehmc.hmc as hmc
 
 
-def test_hmc():
-    def potential_fn(q: TensorVariable) -> TensorVariable:
-        return -1.0 / aet.power(aet.square(q[0]) + aet.square(q[1]), 0.5)
+def normal_logp(q: TensorVariable):
+    return aet.sum(aet.square(q - 3.0))
 
-    srng = RandomStream(seed=59)
+
+def build_trajectory_generator(
+    srng: RandomStream,
+    kernel_generator: Callable,
+    potential_fn: Callable,
+    num_states: int,
+) -> Callable:
+    q = aet.vector("q")
+    potential_energy = potential_fn(q)
+    potential_energy_grad = aesara.grad(potential_energy, wrt=q)
 
     step_size = aet.scalar("step_size")
     inverse_mass_matrix = aet.vector("inverse_mass_matrix")
     num_integration_steps = aet.scalar("num_integration_steps", dtype="int32")
 
-    q = aet.vector("q")
-    potential_energy = potential_fn(q)
-    potential_energy_grad = aesara.grad(potential_energy, wrt=q)
-
-    kernel = hmc.kernel(
+    kernel = kernel_generator(
         srng, potential_fn, step_size, inverse_mass_matrix, num_integration_steps
     )
-    next_step = kernel(q, potential_energy, potential_energy_grad)
 
-    # Compile a function that returns the next state
-    step_fn = aesara.function(
-        (q, step_size, inverse_mass_matrix, num_integration_steps), next_step
-    )
-
-    # Compile a function that integrates the trajectory integrating several times
-    trajectory, _ = aesara.scan(
+    trajectory, updates = aesara.scan(
         fn=kernel,
         outputs_info=[
             {"initial": q},
             {"initial": potential_energy},
             {"initial": potential_energy_grad},
         ],
-        n_steps=1000,
+        n_steps=num_states,
     )
-    traj = aesara.function(
-        (q, step_size, inverse_mass_matrix, num_integration_steps), trajectory
+    trajectory_generator = aesara.function(
+        (q, step_size, inverse_mass_matrix, num_integration_steps),
+        trajectory,
+        updates=updates,
     )
 
-    # Run
-    step_size = 0.01
-    num_integration_steps = 3
-    q = np.array([1.0, 1.0])
-    inverse_mass_matrix = np.array([1.0, 1.0])
+    return trajectory_generator
 
-    # This works
-    samples = []
-    for _ in range(1_000):
-        q, *_ = step_fn(q, step_size, inverse_mass_matrix, num_integration_steps)
-        samples.append(q)
-    print(np.mean(np.array(samples)))
 
-    # This doesn't
-    print(traj(q, step_size, inverse_mass_matrix, num_integration_steps))
+def test_hmc():
+    """Test the HMC kernel on a simple potential."""
+    srng = RandomStream(seed=59)
+    step_size = 0.003
+    num_integration_steps = 10
+    initial_position = np.array([1.0])
+    inverse_mass_matrix = np.array([1.0])
+
+    trajectory_generator = build_trajectory_generator(
+        srng, hmc.kernel, normal_logp, 10_000
+    )
+    positions, *_ = trajectory_generator(
+        initial_position, step_size, inverse_mass_matrix, num_integration_steps
+    )
+
+    assert np.mean(positions[9000:], axis=0) == pytest.approx(3, 1e-1)
