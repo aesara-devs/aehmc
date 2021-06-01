@@ -38,6 +38,7 @@ def kernel(
         potential_energy: TensorVariable,
         potential_energy_grad: TensorVariable,
     ):
+        """Perform a single step of the HMC algorithm."""
         p = momentum_generator(srng)
         (
             q_new,
@@ -75,11 +76,11 @@ def hmc_proposal(
         )
 
         # flip the momentum to keep detailed balance
-        new_p = -1.0 * new_p
+        flipped_p = -1.0 * new_p
 
         # compute transition-related quantities
         energy = potential_energy + kinetic_energy(p)
-        new_energy = new_potential_energy + kinetic_energy(new_p)
+        new_energy = new_potential_energy + kinetic_energy(flipped_p)
         delta_energy = energy - new_energy
         delta_energy = aet.where(aet.isnan(delta_energy), -np.inf, delta_energy)
         # is_transition_divergence = aet.abs(delta_energy) > divergence_threshold
@@ -93,7 +94,7 @@ def hmc_proposal(
             final_potential_energy_grad,
         ) = ifelse(
             do_accept,
-            (new_q, new_p, new_potential_energy, new_potential_energy_grad),
+            (new_q, flipped_p, new_potential_energy, new_potential_energy_grad),
             (q, p, potential_energy, potential_energy_grad),
         )
 
