@@ -41,8 +41,8 @@ def get_config():
     cfg.VCS = "git"
     cfg.style = "pep440"
     cfg.tag_prefix = "v"
-    cfg.parentdir_prefix = "aesara_hmc-"
-    cfg.versionfile_source = "aesara_hmc/_version.py"
+    cfg.parentdir_prefix = "aehmc-"
+    cfg.versionfile_source = "aehmc/_version.py"
     cfg.verbose = False
     return cfg
 

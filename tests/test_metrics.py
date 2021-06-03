@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from aesara.tensor.random.utils import RandomStream
 
-from aesara_hmc.metrics import gaussian_metric
+from aehmc.metrics import gaussian_metric
 
 momentum_test_cases = [
     (np.array([1.0]), -0.218),
