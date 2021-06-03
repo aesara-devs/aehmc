@@ -2,17 +2,15 @@ name: PyPI
 on:
   push:
     branches:
-      - master
+      - main
       - auto-release
   pull_request:
-    branches: [master]
+    branches: [main]
   release:
     types: [published]
 
 jobs:
   build:
-    # Disabled
-    if: false
     name: Build source distribution
     runs-on: ubuntu-latest
     steps:
@@ -25,12 +23,13 @@ jobs:
       - name: Build the sdist
         run: |
           python setup.py sdist
-      - name: Check that the sdist build installs
+      - name: Check the sdist installs and imports
         run: |
           mkdir -p test-sdist
           cd test-sdist
           python -m venv venv-sdist
-          venv-sdist/bin/python -m pip install ../dist/aesara-hmc-*
+          venv-sdist/bin/python -m pip install ../dist/aehmc-*.tar.gz
+          venv-sdist/bin/python -c "import aehmc;print(aehmc.__version__)"
       - uses: actions/upload-artifact@v2
         with:
           name: artifact
@@ -40,9 +39,7 @@ jobs:
     name: Upload to PyPI on release
     needs: [build]
     runs-on: ubuntu-latest
-    # Disabled
-    if: false
-    # if: github.event_name == 'release' && github.event.action == 'published'
+    if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - uses: actions/download-artifact@v2
         with:

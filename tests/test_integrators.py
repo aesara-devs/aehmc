@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from aesara.tensor.var import TensorVariable
 
-from aesara_hmc.integrators import velocity_verlet
+from aehmc.integrators import velocity_verlet
 
 
 def HarmonicOscillator(inverse_mass_matrix, k=1.0, m=1.0):

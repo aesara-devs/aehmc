@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 from aesara.tensor.var import TensorVariable
 
-from aesara_hmc.integrators import velocity_verlet
-from aesara_hmc.trajectory import static_integration
+from aehmc.integrators import velocity_verlet
+from aehmc.trajectory import static_integration
 
 
 def CircularMotion(inverse_mass_matrix):

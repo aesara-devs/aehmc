@@ -6,14 +6,14 @@ from setuptools import setup
 import versioneer
 
 setup(
-    name="aesara-hmc",
+    name="aehmc",
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
-    description="An HMC implementation written in Aesara",
-    url="http://github.com/AmpersandTV/aesara-hmc",
+    description="HMC samplers in Aesara",
+    url="http://github.com/aesara-devs/aehmc",
     maintainer="Brandon T. Willard",
-    maintainer_email="brandonwillard+aesara_hmc@gmail.com",
-    packages=["aesara_hmc"],
+    maintainer_email="aesara.devs@gmail.com",
+    packages=["aehmc"],
     install_requires=[
         "numpy>=1.18.1",
         "scipy>=1.4.0",
