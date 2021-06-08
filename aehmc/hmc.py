@@ -19,6 +19,32 @@ def kernel(
     num_integration_steps: TensorVariable,
     divergence_threshold: int = 1000,
 ):
+    """Build a HMC kernel.
+
+    Parameters
+    ----------
+    srng
+        RandomStream object.
+    potential_fn
+        A function that returns the potential energy of a chain at a given position.
+    step_size
+        The step size used in the symplectic integrator
+    inverse_mass_matrix
+        One or two-dimensional array used as the inverse mass matrix that
+        defines the euclidean metric.
+    num_integration_steps
+        The number of times we apply the symplectic integrator to integrate the trajectory.
+    divergence_threshold
+        The difference in energy above which we say the transition is
+        divergent.
+
+    Returns
+    -------
+    A kernel that takes the current state of the chain and that returns a new
+    state.
+
+
+    """
 
     momentum_generator, kinetic_energy_fn, _ = metrics.gaussian_metric(
         inverse_mass_matrix
@@ -57,6 +83,7 @@ def hmc_proposal(
     num_integration_steps: TensorVariable,
     divergence_threshold: int,
 ):
+    """Builds a function that returns a HMC proposal."""
 
     integrate = trajectory.static_integration(
         integrator, step_size, num_integration_steps
@@ -69,6 +96,7 @@ def hmc_proposal(
         potential_energy: TensorVariable,
         potential_energy_grad: TensorVariable,
     ):
+        """Use the HMC algorithm to propose a new state."""
 
         new_q, new_p, new_potential_energy, new_potential_energy_grad = integrate(
             q, p, potential_energy, potential_energy_grad
