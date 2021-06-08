@@ -8,13 +8,14 @@ from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
 
 import aehmc.hmc as hmc
+import aehmc.nuts as nuts
 
 
 def normal_logp(q: TensorVariable):
     return aet.sum(aet.square(q - 3.0))
 
 
-def build_trajectory_generator(
+def build_hmc_trajectory_generator(
     srng: RandomStream,
     kernel_generator: Callable,
     potential_fn: Callable,
@@ -58,7 +59,7 @@ def test_hmc():
     initial_position = np.array([1.0])
     inverse_mass_matrix = np.array([1.0])
 
-    trajectory_generator = build_trajectory_generator(
+    trajectory_generator = build_hmc_trajectory_generator(
         srng, hmc.kernel, normal_logp, 50_000
     )
     positions, *_ = trajectory_generator(
@@ -66,3 +67,37 @@ def test_hmc():
     )
 
     assert np.mean(positions[10_000:], axis=0) == pytest.approx(3, 1e-1)
+
+
+def test_nuts():
+    """Test the NUTS kernel on a simple potential."""
+    srng = RandomStream(seed=59)
+
+    q = aet.vector("q")
+    potential_energy = normal_logp(q)
+    potential_energy_grad = aesara.grad(potential_energy, wrt=q)
+
+    step_size = aet.scalar("step_size", dtype="float64")
+    inverse_mass_matrix = aet.vector("inverse_mass_matrix", dtype="float64")
+
+    kernel = nuts.kernel(srng, normal_logp, step_size, inverse_mass_matrix)
+    result, updates = kernel(q, potential_energy, potential_energy_grad)
+
+    trajectory_generator = aesara.function(
+        (q, step_size, inverse_mass_matrix),
+        result,
+        updates=updates,
+    )
+
+    step_size = 0.01
+    initial_position = np.array([1.0])
+    inverse_mass_matrix = np.array([1.0])
+
+    q = initial_position
+    positions = []
+    for _ in range(1000):
+        result = trajectory_generator(q, step_size, inverse_mass_matrix)
+        q = result[0]
+        positions.append(q)
+
+    assert np.mean(np.array(positions)[300:]) == pytest.approx(3, 1e-1)

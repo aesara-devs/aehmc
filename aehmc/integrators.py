@@ -8,6 +8,14 @@ IntegratorStateType = Tuple[
 ]
 
 
+def new_integrator_state(
+    potential_fn: Callable, position: TensorVariable, momentum: TensorVariable
+):
+    potential_energy = potential_fn(position)
+    potential_energy_grad = aesara.grad(potential_energy, position)
+    return (position, momentum, potential_energy, potential_energy_grad)
+
+
 def velocity_verlet(
     potential_fn: Callable[[TensorVariable], TensorVariable],
     kinetic_energy_fn: Callable[[TensorVariable], TensorVariable],
@@ -21,6 +29,15 @@ def velocity_verlet(
     (a1, b1, a2, b1, a1) with a1 = 0. It is numerically stable for values of
     the step size that range between 0 and 2 (when the mass matrix is the
     identity).
+
+    Parameters
+    ----------
+    potential_fn
+        A function that returns the potential energy of a chain at a given
+        position.
+    kinetic_energy_fn
+        A function that returns the kinetic energy of a chain at a given
+        position and a given momentum.
 
     References
     ----------
