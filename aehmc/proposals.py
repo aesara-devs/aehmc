@@ -17,7 +17,7 @@ def proposal_generator(kinetic_energy: Callable, divergence_threshold: float):
         new_energy = potential_energy + kinetic_energy(p)
 
         delta_energy = initial_energy - new_energy
-        delta_energy = aet.where(aet.isnan(delta_energy) - np.inf, delta_energy)
+        delta_energy = aet.where(aet.isnan(delta_energy), - np.inf, delta_energy)
         is_transition_divergent = aet.abs(delta_energy) > divergence_threshold
 
         weight = delta_energy
@@ -32,9 +32,9 @@ def proposal_generator(kinetic_energy: Callable, divergence_threshold: float):
 
 def progressive_uniform_sampling(srng, proposal, new_proposal):
     state, energy, weight, sum_log_p_accept = proposal
-    new_state, new_energy, new_weight, new_sum_log_p_accept = proposal
+    new_state, new_energy, new_weight, new_sum_log_p_accept = new_proposal
 
-    p_accept = _expit(new_weight - weight)
+    p_accept = aet.expit(new_weight - weight)
     do_accept = aet.random.bernoulli(srng, p_accept)
     updated_weight = _logaddexp(weight, new_weight)
     updated_sum_log_p_accept = _logaddexp(sum_log_p_accept, new_sum_log_p_accept)
@@ -46,10 +46,6 @@ def progressive_uniform_sampling(srng, proposal, new_proposal):
     )
 
     return updated_proposal
-
-
-def _expit(x):
-    return 1 / (1 + aet.exp(-x))
 
 
 def _logaddexp(a, b):
