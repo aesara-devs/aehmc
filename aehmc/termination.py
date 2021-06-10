@@ -64,7 +64,7 @@ def iterative_uturn(is_turning_fn: Callable):
 
         ncs, _ = aesara.scan(
             count_subtrees,
-            outputs_info=(aet.constant(step), aet.constant(0)),
+            outputs_info=((aet.constant(step), aet.constant(0))),
             n_steps=step,
         )
         num_subtrees = ncs[-1][1]
@@ -89,9 +89,13 @@ def iterative_uturn(is_turning_fn: Callable):
         """Check if a U-Turn happened in the current trajectory.
 
         To do so we iterate over the recorded momenta and sums of momentum that
-        are relevant. None if this is an odd node, otherwise the leftmost node of
-        all subtrees for which the current node is the rightmost node. The system
-        is such that all the relevant nodes are stored between `idx_min` and `idx_max`
+        are relevant. None if the current node is an odd node, otherwise the
+        leftmost node of all subtrees for which the current node is the
+        rightmost node. The momentum and sum of momentum corresponding to the
+        nodes for which we need to check the U-Turn criterion are stored
+        between `idx_min` and `idx_max` in `momentum_ckpts` and
+        `momentum_sum_ckpts` respectively.
+
         """
         momentum_ckpts, momentum_sum_ckpts, idx_min, idx_max = state
 
@@ -99,12 +103,12 @@ def iterative_uturn(is_turning_fn: Callable):
             subtree_momentum_sum = (
                 momentum_sum - momentum_sum_ckpts[i] + momentum_ckpts[i]
             )
-            is_turning = is_turning_fn(momentum_ckpts[i], momentum, subtree_momentum_sum)
-            do_stop = aet.lt(i - 1, idx_min) or is_turning
+            is_turning = is_turning_fn(momentum_ckpts[i], momentum, subtree_momentum_sum)[0]
+            reached_max_iteration = aet.lt(i - 1, idx_min)
+            do_stop = is_turning | reached_max_iteration
             return (i - 1, is_turning), until(do_stop)
 
         val, _ = aesara.scan(body_fn, outputs_info=(idx_max, None), n_steps=idx_max + 2)
-        # is_turning = turning_values[-1]
 
         return val
 

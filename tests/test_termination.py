@@ -10,7 +10,7 @@ from aehmc.metrics import gaussian_metric
 
 @pytest.mark.parametrize(
     "checkpoint_idxs, expected_turning",
-    [((3, 2), False), ((3, 3), True), ((0, 0), False), ((0, 1), True), ((1, 3), True)],
+    [((3, 3), True), ((0, 0), False), ((0, 1), True), ((1, 3), True)],
 )
 def test_iterative_turning_termination(checkpoint_idxs, expected_turning):
     inverse_mass_matrix = aet.as_tensor(np.ones(1))
@@ -29,7 +29,7 @@ def test_iterative_turning_termination(checkpoint_idxs, expected_turning):
 
     _, _, is_iterative_turning_fn = iterative_uturn(is_turning)
     is_iterative_turning = is_iterative_turning_fn(ckpt_state, momentum_sum, momentum)
-    fn = aesara.function((momentum, momentum_sum), is_iterative_turning)
+    fn = aesara.function((momentum, momentum_sum), is_iterative_turning, on_unused_input='ignore')
 
     actual_turning = fn(1., 3.)
 
