@@ -3,6 +3,7 @@ from typing import Callable, Tuple
 import aesara
 import aesara.tensor as aet
 import numpy as np
+from aesara.ifelse import ifelse
 from aesara.scan.utils import until
 from aesara.tensor.var import TensorVariable
 
@@ -25,12 +26,12 @@ def iterative_uturn(is_turning_fn: Callable):
     """
 
     def new_state(
-        state: TensorVariable, max_num_doublings: int
+        position: TensorVariable, max_num_doublings: int
     ) -> Tuple[TensorVariable, TensorVariable, int, int]:
-        num_dims = state.ndims
+        num_dims = position.ndim
         return (
-            aet.zeros(max_num_doublings, num_dims),
-            aet.zeros(max_num_doublings, num_dims),
+            aet.zeros((max_num_doublings, num_dims)),
+            aet.zeros((max_num_doublings, num_dims)),
             0,
             0,
         )
@@ -40,13 +41,16 @@ def iterative_uturn(is_turning_fn: Callable):
     ):
         momentum_ckpt, momentum_sum_ckpt, *_ = state
         idx_min, idx_max = _find_storage_indices(step)
-        update_momentum_cktp, update_momentum_sum_ckpt = aesara.ifelse(
-            step % 2 == 0,
-            (momentum, momentum_sum),
-            (momentum_ckpt, momentum_sum_ckpt[idx_max]),
+        momentum_ckpt = aet.where(
+            aet.eq(step % 2, 0),
+            aet.set_subtensor(momentum_ckpt[idx_max], momentum),
+            momentum_ckpt,
         )
-        momentum_ckpt[idx_max] = update_momentum_cktp
-        momentum_sum_ckpt[idx_max] = update_momentum_sum_ckpt
+        momentum_sum_ckpt = aet.where(
+            aet.eq(step % 2, 0),
+            aet.set_subtensor(momentum_sum_ckpt[idx_max], momentum_sum),
+            momentum_sum_ckpt,
+        )
 
         return (momentum_ckpt, momentum_sum_ckpt, idx_min, idx_max)
 
@@ -57,25 +61,31 @@ def iterative_uturn(is_turning_fn: Callable):
 
         """
 
-        def count_subtrees(nc):
-            nc[0] = nc[0] >> 1
-            nc[1] = nc[1] + 1
-            return nc, until(nc[0] & 1 == 0)
+        def count_subtrees(nc0, nc1):
+            nc0 = nc0 // 2
+            nc1 = nc1 + 1
+            do_stop = aet.eq(nc0 & 1, 0)
+            return (nc0, nc1), until(do_stop)
 
         ncs, _ = aesara.scan(
             count_subtrees,
-            outputs_info=((aet.constant(step), aet.constant(0))),
+            outputs_info=(step, 0),
             n_steps=step,
         )
         num_subtrees = ncs[-1][1]
 
-        def find_idx_max(nc):
-            nc[0] = nc[0] >> 1
-            nc[1] = nc[1] + (nc[0] & 1)
-            return nc, until(nc[1] <= 0)
+        def find_idx_max(nc0, nc1):
+            nc0 = nc0 // 2
+            nc1 = nc1 + (nc0 & 1)
+            do_stop = aet.lt(nc1, 0)
+            return (nc0, nc1), until(do_stop)
 
+        init = (step // 2).astype("int32")
+        init1 = aet.constant(0).astype("int32")
         ncs, _ = aesara.scan(
-            find_idx_max, (aet.constant(step >> 1), aet.constant(0)), n_steps=step
+            find_idx_max,
+            outputs_info=(init, init1),
+            n_steps=step,
         )
         idx_max = ncs[-1][1]
 
@@ -103,13 +113,16 @@ def iterative_uturn(is_turning_fn: Callable):
             subtree_momentum_sum = (
                 momentum_sum - momentum_sum_ckpts[i] + momentum_ckpts[i]
             )
-            is_turning = is_turning_fn(momentum_ckpts[i], momentum, subtree_momentum_sum)[0]
+            is_turning = is_turning_fn(
+                momentum_ckpts[i], momentum, subtree_momentum_sum
+            )[0]
             reached_max_iteration = aet.lt(i - 1, idx_min)
             do_stop = is_turning | reached_max_iteration
             return (i - 1, is_turning), until(do_stop)
 
         val, _ = aesara.scan(body_fn, outputs_info=(idx_max, None), n_steps=idx_max + 2)
+        is_turning = val[1][-1]
 
-        return val
+        return is_turning
 
     return new_state, update, is_iterative_turning
