@@ -7,6 +7,13 @@ IntegratorStateType = Tuple[
     TensorVariable, TensorVariable, TensorVariable, TensorVariable
 ]
 
+# -------------------------------------------------------------------
+#                       STATIC INTEGRATION
+#
+# This section contains algorithms that integrate the trajectory for
+# a set number of integrator steps.
+# -------------------------------------------------------------------
+
 
 def static_integration(
     integrator: Callable,
@@ -37,3 +44,20 @@ def static_integration(
         return q[-1], p[-1], energy[-1], energy_grad[-1]
 
     return integrate
+
+
+# -------------------------------------------------------------------
+#                       DYNAMIC INTEGRATION
+#
+# This section contains algorithms that determine the number of
+# integrator steps dynamically using a termination criterion that
+# is updated at every step.
+# -------------------------------------------------------------------
+
+
+def dynamic_integration():
+    raise NotImplementedError
+
+
+def multiplicative_expansion():
+    raise NotImplementedError
