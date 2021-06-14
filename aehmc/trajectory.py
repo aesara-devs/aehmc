@@ -1,7 +1,11 @@
 from typing import Callable, Tuple
 
 import aesara
+from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
+from aesara.scan.utils import until
+
+from aehmc.proposals import proposal_generator, progressive_uniform_sampling
 
 from aehmc.proposals import generate_proposal, progressive_uniform_sampling
 
@@ -21,6 +25,15 @@ TrajectoryType = Tuple[
     IntegratorStateType, IntegratorStateType, TensorVariable, TensorVariable
 ]
 
+<<<<<<< HEAD
+=======
+
+def append_to_trajectory(trajectory, new_state):
+    """Append a state to the right of a trajectory."""
+    return (trajectory[0], new_state, trajectory[2] + new_state[1], trajectory[3] + 1)
+
+
+>>>>>>> 49673bd (draft dynamic integration)
 # -------------------------------------------------------------------
 #                       STATIC INTEGRATION
 #
@@ -93,11 +106,11 @@ def dynamic_integration(
         Value of the difference of energy between two consecutive states above which we say a transition is divergent.
 
     """
-    _, generate_proposal = generate_proposal(kinetic_energy, divergence_threshold)
+    _, generate_proposal = proposal_generator(kinetic_energy, divergence_threshold)
     sample_proposal = progressive_uniform_sampling
 
     def integrate(
-        srg: RandomStream,
+        srng: RandomStream,
         previous_state: IntegratorStateType,
         direction: TensorVariable,
         termination_state: TerminationStateType,
@@ -137,7 +150,7 @@ def dynamic_integration(
             once starting from the last state of the previous trajectory.
 
             """
-            initial_state = integrator(*initial_state, direction * step_size)
+            initial_state = integrator(*previous_last_state, direction * step_size)
             initial_proposal, _ = generate_proposal(initial_energy, initial_state)
             initial_trajectory = (initial_state, initial_state, initial_state[1], 1)
             initial_termination_state = update_termination_state(
@@ -162,7 +175,7 @@ def dynamic_integration(
             new_proposal, is_diverging = generate_proposal(initial_energy, new_state)
 
             new_trajectory = append_to_trajectory(trajectory, new_state)
-            sampled_proposal = sample_proposal(proposal, new_proposal)
+            sampled_proposal = sample_proposal(srng, proposal, new_proposal)
 
             momentum_sum = new_trajectory[3]
             momentum = new_state[2]
@@ -177,7 +190,7 @@ def dynamic_integration(
                 ~do_keep_integrating(is_diverging, has_terminated)
             )
 
-        proposal, trajectory, termination_state = take_first_step(state, previous_state)
+        proposal, trajectory, termination_state = take_first_step(previous_state, termination_state)
 
         _ = aesara.scan(
             add_one_state,
@@ -186,6 +199,8 @@ def dynamic_integration(
         )
 
         return _
+
+    return integrate
 
 
 def multiplicative_expansion():
