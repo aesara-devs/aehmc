@@ -3,8 +3,22 @@ from typing import Callable, Tuple
 import aesara
 from aesara.tensor.var import TensorVariable
 
+from aehmc.proposals import generate_proposal, progressive_uniform_sampling
+
 IntegratorStateType = Tuple[
     TensorVariable, TensorVariable, TensorVariable, TensorVariable
+]
+
+ProposalType = Tuple[
+    IntegratorStateType, TensorVariable, TensorVariable, TensorVariable
+]
+
+TerminationStateType = Tuple[
+    TensorVariable, TensorVariable, TensorVariable, TensorVariable
+]
+
+TrajectoryType = Tuple[
+    IntegratorStateType, IntegratorStateType, TensorVariable, TensorVariable
 ]
 
 # -------------------------------------------------------------------
@@ -55,8 +69,123 @@ def static_integration(
 # -------------------------------------------------------------------
 
 
-def dynamic_integration():
-    raise NotImplementedError
+def dynamic_integration(
+    integrator: Callable,
+    kinetic_energy: Callable,
+    update_termination_state: Callable,
+    is_criterion_met: Callable,
+    divergence_threshold: TensorVariable,
+):
+    """Integrate a trajectory and update the proposal sequentially in one direction
+    until the termination criterion is met.
+
+    Parameters
+    ----------
+    integrator
+        The symplectic integrator used to integrate the hamiltonian trajectory.
+    kinetic_energy
+        Function to compute the current value of the kinetic energy.
+    update_termination_state
+        Updates the state of the termination mechanism.
+    is_criterion_met
+        Determines whether the termination criterion has been met.
+    divergence_threshold
+        Value of the difference of energy between two consecutive states above which we say a transition is divergent.
+
+    """
+    _, generate_proposal = generate_proposal(kinetic_energy, divergence_threshold)
+    sample_proposal = progressive_uniform_sampling
+
+    def integrate(
+        srg: RandomStream,
+        previous_state: IntegratorStateType,
+        direction: TensorVariable,
+        termination_state: TerminationStateType,
+        max_num_steps: TensorVariable,
+        step_size: TensorVariable,
+        initial_energy: TensorVariable,
+    ):
+        """Integrate the trajectory starting from `initial_state` and update
+        the proposal sequentially until the termination criterion is met.
+
+        Parameters
+        ----------
+        rng_key
+            Key used by JAX's random number generator.
+        previous_state
+            The last state of the previously integrated trajectory.
+        direction int in {-1, 1}
+            The direction in which to expand the trajectory.
+        termination_state
+            The state that keeps track of the information needed for the termination criterion.
+        max_num_steps
+            The maximum number of integration steps. The expansion will stop
+            when this number is reached if the termination criterion has not
+            been met.
+        step_size
+            The step size of the symplectic integrator.
+        initial_energy
+            Initial energy H0 of the HMC step (not to confused with the initial energy of the subtree)
+
+        """
+
+        def take_first_step(
+            previous_last_state: IntegratorStateType,
+            termination_state: TerminationStateType,
+        ):
+            """The first state of the new trajectory is obtained by integrating
+            once starting from the last state of the previous trajectory.
+
+            """
+            initial_state = integrator(*initial_state, direction * step_size)
+            initial_proposal, _ = generate_proposal(initial_energy, initial_state)
+            initial_trajectory = (initial_state, initial_state, initial_state[1], 1)
+            initial_termination_state = update_termination_state(
+                termination_state, initial_trajectory[2], initial_state[1]
+            )
+            return (
+                initial_proposal,
+                initial_trajectory,
+                initial_termination_state,
+            )
+
+        def do_keep_integrating(is_diverging, has_terminated):
+            return ~has_terminated & ~is_diverging
+
+        def add_one_state(
+            proposal: ProposalType,
+            trajectory: TrajectoryType,
+            termination_state: TerminationStateType,
+        ):
+            last_state = trajectory[1]
+            new_state = integrator(*last_state, direction * step_size)
+            new_proposal, is_diverging = generate_proposal(initial_energy, new_state)
+
+            new_trajectory = append_to_trajectory(trajectory, new_state)
+            sampled_proposal = sample_proposal(proposal, new_proposal)
+
+            momentum_sum = new_trajectory[3]
+            momentum = new_state[2]
+            new_termination_state = update_termination_state(
+                termination_state, momentum_sum, momentum
+            )
+            has_terminated = is_criterion_met(
+                new_termination_state, momentum_sum, momentum
+            )
+
+            return (sampled_proposal, new_trajectory, new_termination_state), until(
+                ~do_keep_integrating(is_diverging, has_terminated)
+            )
+
+        proposal, trajectory, termination_state = take_first_step(state, previous_state)
+
+        _ = aesara.scan(
+            add_one_state,
+            outputs_info=(proposal, trajectory, termination_state),
+            num_steps=max_num_steps,
+        )
+
+        return _
 
 
 def multiplicative_expansion():
