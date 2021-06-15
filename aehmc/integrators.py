@@ -8,6 +8,12 @@ IntegratorStateType = Tuple[
 ]
 
 
+def new_integrator_state(potential_fn: Callable, position: TensorVariable, momentum: TensorVariable):
+    potential_energy = potential_fn(position)
+    potential_energy_grad = aesara.grad(potential_energy, position)
+    return (position, momentum, potential_energy, potential_energy_grad)
+
+
 def velocity_verlet(
     potential_fn: Callable[[TensorVariable], TensorVariable],
     kinetic_energy_fn: Callable[[TensorVariable], TensorVariable],

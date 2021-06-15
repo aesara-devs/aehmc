@@ -2,10 +2,14 @@ import aesara
 import aesara.tensor as aet
 import numpy as np
 import pytest
+from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
+from aeppl.logprob import logprob
 
-from aehmc.integrators import velocity_verlet
-from aehmc.trajectory import static_integration
+from aehmc.integrators import velocity_verlet, new_integrator_state
+from aehmc.metrics import gaussian_metric
+from aehmc.termination import iterative_uturn
+from aehmc.trajectory import dynamic_integration, static_integration
 
 
 def CircularMotion(inverse_mass_matrix):
@@ -54,3 +58,59 @@ def test_static_integration(example):
 
     np.testing.assert_allclose(q_final, example["q_final"], atol=1e-1)
     np.testing.assert_allclose(p_final, example["p_final"], atol=1e-1)
+
+
+@pytest.mark.parametrize("case", [(0.0001, False), (1000, True)])
+def test_dynamic_integration_divergence(case):
+    srng = RandomStream(seed=59)
+
+    def potential_fn(x):
+        return logprob(aet.random.normal(0., 1.), x)
+
+    should_diverge = case[1]
+
+    # Set up the trajectory integrator
+    inverse_mass_matrix = aet.ones(1)
+
+    momentum_generator, kinetic_energy_fn, uturn_check_fn = gaussian_metric(
+        inverse_mass_matrix
+    )
+    integrator = velocity_verlet(potential_fn, kinetic_energy_fn)
+    (
+        new_criterion_state,
+        update_criterion_state,
+        is_criterion_met,
+    ) = iterative_uturn(uturn_check_fn)
+
+    trajectory_integrator = dynamic_integration(
+        integrator,
+        kinetic_energy_fn,
+        update_criterion_state,
+        is_criterion_met,
+        divergence_threshold=aet.as_tensor(1000),
+    )
+
+    # Initialize the state
+    direction = aet.as_tensor
+    step_size = aet.as_tensor(case[0])
+    max_num_steps = aet.as_tensor(100)
+    num_doublings = aet.as_tensor(10)
+    position = aet.as_tensor(np.ones(1))
+
+    initial_state = new_integrator_state(
+        potential_fn, position, momentum_generator(srng)
+    )
+    initial_energy = initial_state[2] + kinetic_energy_fn(initial_state[1])
+    termination_state = new_criterion_state(initial_state[0], num_doublings)
+
+    _ = trajectory_integrator(
+        srng,
+        initial_state,
+        direction,
+        termination_state,
+        max_num_steps,
+        step_size,
+        initial_energy,
+    )
+
+    assert _ is should_diverge

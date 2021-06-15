@@ -70,7 +70,7 @@ def iterative_uturn(is_turning_fn: Callable):
 
         ncs, _ = aesara.scan(
             count_subtrees,
-            outputs_info=(step, 0),
+            outputs_info=(step, -1),
             n_steps=step,
         )
         num_subtrees = ncs[1][-1]

@@ -1,7 +1,7 @@
 from typing import Callable
 
 import aesara
-import aesara.tensort as aet
+import aesara.tensor as aet
 import numpy as np
 
 
@@ -24,6 +24,8 @@ def proposal_generator(kinetic_energy: Callable, divergence_threshold: float):
         sum_log_p_accept = aet.minimum(delta_energy, 0.)
 
         return (state, new_energy, weight, sum_log_p_accept), is_transition_divergent
+
+    return init, update
 
 
 # -------------------------------------------------------------------
