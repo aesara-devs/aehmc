@@ -3,6 +3,7 @@ import pytest
 import aesara
 import aesara.tensor as aet
 import numpy as np
+from numpy.testing import assert_array_equal
 
 from aehmc.termination import iterative_uturn
 from aehmc.metrics import gaussian_metric
@@ -40,17 +41,19 @@ def test_termination_update():
     inverse_mass_matrix = aet.as_tensor(np.ones(1))
     _, _, is_turning = gaussian_metric(inverse_mass_matrix)
     new_state, update, _ = iterative_uturn(is_turning)
-    
+
     position = aet.as_tensor(np.ones(3))
     momentum = aet.as_tensor(np.ones(3))
     momentum_sum = aet.as_tensor(np.ones(3))
 
-    num_doublings = aet.as_tensor(3)
-    termination_state  = new_state(position, num_doublings)
-    
+    num_doublings = aet.as_tensor(4)
+    termination_state = new_state(position, num_doublings)
+
     step = aet.scalar("step", dtype='int32')
     updated = update(termination_state, momentum_sum, momentum, step)
-    update_fn = aesara.function((step,), updated)
+    update_fn = aesara.function((step,), updated, on_unused_input='ignore')
 
-    result = update_fn(3)
-    print(result)
+    # When the number of steps is odd there should be no update
+    result_odd = update_fn(5)
+    assert_array_equal(result_odd[0], np.zeros((4, 3)))
+    assert_array_equal(result_odd[1], np.zeros((4, 3)))

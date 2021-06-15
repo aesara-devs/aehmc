@@ -28,7 +28,7 @@ def iterative_uturn(is_turning_fn: Callable):
     def new_state(
         position: TensorVariable, max_num_doublings: int
     ) -> Tuple[TensorVariable, TensorVariable, int, int]:
-        num_dims = position.ndim
+        num_dims = position.shape[0]
         return (
             aet.zeros((max_num_doublings, num_dims)),
             aet.zeros((max_num_doublings, num_dims)),
@@ -41,6 +41,7 @@ def iterative_uturn(is_turning_fn: Callable):
     ):
         momentum_ckpt, momentum_sum_ckpt, *_ = state
         idx_min, idx_max = _find_storage_indices(step)
+
         momentum_ckpt = aet.where(
             aet.eq(step % 2, 0),
             aet.set_subtensor(momentum_ckpt[idx_max], momentum),
@@ -72,22 +73,22 @@ def iterative_uturn(is_turning_fn: Callable):
             outputs_info=(step, 0),
             n_steps=step,
         )
-        num_subtrees = ncs[-1][1]
+        num_subtrees = ncs[1][-1]
 
         def find_idx_max(nc0, nc1):
             nc0 = nc0 // 2
             nc1 = nc1 + (nc0 & 1)
-            do_stop = aet.lt(nc1, 0)
+            do_stop = aet.lt(nc0, 0)
             return (nc0, nc1), until(do_stop)
 
-        init = (step // 2).astype("int32")
+        init = step // 2
         init1 = aet.constant(0).astype("int32")
         ncs, _ = aesara.scan(
             find_idx_max,
             outputs_info=(init, init1),
             n_steps=step,
         )
-        idx_max = ncs[-1][1]
+        idx_max = ncs[1][-1]
 
         idx_min = idx_max - num_subtrees + 1
 
