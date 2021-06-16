@@ -53,6 +53,9 @@ def test_termination_update():
     updated = update(termination_state, momentum_sum, momentum, step)
     update_fn = aesara.function((step,), updated, on_unused_input='ignore')
 
+    # Make sure this works for a single step
+    result_odd = update_fn(1)
+
     # When the number of steps is odd there should be no update
     result_odd = update_fn(5)
     assert_array_equal(result_odd[0], np.zeros((4, 3)))

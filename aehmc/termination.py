@@ -37,7 +37,7 @@ def iterative_uturn(is_turning_fn: Callable):
         )
 
     def update(
-        state: Tuple, momentum_sum: TensorVariable, momentum: TensorVariable, step: int
+        state: Tuple, momentum_sum: TensorVariable, momentum: TensorVariable, step: TensorVariable
     ):
         momentum_ckpt, momentum_sum_ckpt, *_ = state
         idx_min, idx_max = _find_storage_indices(step)
