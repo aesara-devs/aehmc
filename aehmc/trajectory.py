@@ -1,21 +1,17 @@
 from typing import Callable, Tuple
 
 import aesara
+import numpy as np
+from aesara.scan.utils import until
 from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
-from aesara.scan.utils import until
 
-from aehmc.proposals import proposal_generator, progressive_uniform_sampling
-
-from aehmc.proposals import generate_proposal, progressive_uniform_sampling
-
-IntegratorStateType = Tuple[
-    TensorVariable, TensorVariable, TensorVariable, TensorVariable
-]
-
-ProposalType = Tuple[
-    IntegratorStateType, TensorVariable, TensorVariable, TensorVariable
-]
+from aehmc.integrators import IntegratorStateType
+from aehmc.proposals import (
+    ProposalStateType,
+    progressive_uniform_sampling,
+    proposal_generator,
+)
 
 TerminationStateType = Tuple[
     TensorVariable, TensorVariable, TensorVariable, TensorVariable
@@ -25,15 +21,12 @@ TrajectoryType = Tuple[
     IntegratorStateType, IntegratorStateType, TensorVariable, TensorVariable
 ]
 
-<<<<<<< HEAD
-=======
 
 def append_to_trajectory(trajectory, new_state):
     """Append a state to the right of a trajectory."""
     return (trajectory[0], new_state, trajectory[2] + new_state[1], trajectory[3] + 1)
 
 
->>>>>>> 49673bd (draft dynamic integration)
 # -------------------------------------------------------------------
 #                       STATIC INTEGRATION
 #
@@ -111,7 +104,7 @@ def dynamic_integration(
 
     def integrate(
         srng: RandomStream,
-        previous_state: IntegratorStateType,
+        previous_last_state: IntegratorStateType,
         direction: TensorVariable,
         termination_state: TerminationStateType,
         max_num_steps: TensorVariable,
@@ -125,7 +118,7 @@ def dynamic_integration(
         ----------
         rng_key
             Key used by JAX's random number generator.
-        previous_state
+        previous_last_state
             The last state of the previously integrated trajectory.
         direction int in {-1, 1}
             The direction in which to expand the trajectory.
@@ -145,60 +138,118 @@ def dynamic_integration(
         def take_first_step(
             previous_last_state: IntegratorStateType,
             termination_state: TerminationStateType,
-        ):
+        ) -> Tuple[IntegratorStateType, ProposalStateType, TerminationStateType]:
             """The first state of the new trajectory is obtained by integrating
             once starting from the last state of the previous trajectory.
 
             """
             initial_state = integrator(*previous_last_state, direction * step_size)
             initial_proposal, _ = generate_proposal(initial_energy, initial_state)
-            initial_trajectory = (initial_state, initial_state, initial_state[1], 1)
             initial_termination_state = update_termination_state(
-                termination_state, initial_trajectory[2], initial_state[1]
+                termination_state,
+                initial_state[1],
+                initial_state[1],
+                1,
             )
             return (
+                initial_state,
                 initial_proposal,
-                initial_trajectory,
                 initial_termination_state,
             )
 
-        def do_keep_integrating(is_diverging, has_terminated):
-            return ~has_terminated & ~is_diverging
-
         def add_one_state(
-            proposal: ProposalType,
-            trajectory: TrajectoryType,
-            termination_state: TerminationStateType,
+            step,
+            q_proposal,
+            p_proposal,
+            potential_energy_proposal,
+            potential_energy_grad_proposal,
+            energy_proposal,
+            weight,
+            sum_log_p_accept,
+            q_last,
+            p_last,
+            potential_energy_last,
+            potential_energy_grad_last,
+            momentum_sum: TensorVariable,
+            momentum_ckpts,
+            momentum_sum_ckpts,
+            idx_min,
+            idx_max,
+            is_diverging,
+            has_terminated,
         ):
-            last_state = trajectory[1]
+            last_state = (
+                q_last,
+                p_last,
+                potential_energy_last,
+                potential_energy_grad_last,
+            )
+            termination_state = (momentum_ckpts, momentum_sum_ckpts, idx_min, idx_max)
+            proposal = (
+                (
+                    q_proposal,
+                    p_proposal,
+                    potential_energy_proposal,
+                    potential_energy_grad_proposal,
+                ),
+                energy_proposal,
+                weight,
+                sum_log_p_accept,
+            )
+
             new_state = integrator(*last_state, direction * step_size)
             new_proposal, is_diverging = generate_proposal(initial_energy, new_state)
-
-            new_trajectory = append_to_trajectory(trajectory, new_state)
             sampled_proposal = sample_proposal(srng, proposal, new_proposal)
 
-            momentum_sum = new_trajectory[3]
-            momentum = new_state[2]
+            momentum = new_state[1]
+            momentum_sum = momentum_sum + momentum
             new_termination_state = update_termination_state(
-                termination_state, momentum_sum, momentum
+                termination_state, momentum_sum, momentum, step
             )
             has_terminated = is_criterion_met(
                 new_termination_state, momentum_sum, momentum
             )
 
-            return (sampled_proposal, new_trajectory, new_termination_state), until(
-                ~do_keep_integrating(is_diverging, has_terminated)
-            )
+            do_stop_integrating = is_diverging | has_terminated
 
-        proposal, trajectory, termination_state = take_first_step(previous_state, termination_state)
+            return (
+                step + 1,
+                *sampled_proposal[0],
+                sampled_proposal[1],
+                sampled_proposal[2],
+                sampled_proposal[3],
+                *new_state,
+                momentum_sum,
+                *new_termination_state,
+                is_diverging,
+                has_terminated,
+            ), until(do_stop_integrating)
 
-        _ = aesara.scan(
-            add_one_state,
-            outputs_info=(proposal, trajectory, termination_state),
-            num_steps=max_num_steps,
+        initial_state, initial_proposal, initial_termination_state = take_first_step(
+            previous_last_state, termination_state
         )
 
-        return _
+        traj, updates = aesara.scan(
+            add_one_state,
+            outputs_info=(
+                2,
+                *initial_proposal[0],
+                initial_proposal[1],
+                initial_proposal[2],
+                initial_proposal[3],
+                *initial_state,
+                initial_state[1],
+                *termination_state,
+                np.array(False),
+                np.array(False),
+            ),
+            n_steps=max_num_steps,
+        )
+
+        is_diverging = traj[-2][-1]
+        has_terminated = traj[-1][-1]
+
+        return (is_diverging, has_terminated), updates
 
     return integrate
 

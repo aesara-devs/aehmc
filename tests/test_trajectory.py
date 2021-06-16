@@ -2,11 +2,11 @@ import aesara
 import aesara.tensor as aet
 import numpy as np
 import pytest
+from aeppl.logprob import logprob
 from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
-from aeppl.logprob import logprob
 
-from aehmc.integrators import velocity_verlet, new_integrator_state
+from aehmc.integrators import new_integrator_state, velocity_verlet
 from aehmc.metrics import gaussian_metric
 from aehmc.termination import iterative_uturn
 from aehmc.trajectory import dynamic_integration, static_integration
@@ -65,7 +65,7 @@ def test_dynamic_integration_divergence(case):
     srng = RandomStream(seed=59)
 
     def potential_fn(x):
-        return logprob(aet.random.normal(0., 1.), x)
+        return -aet.sum(logprob(aet.random.normal(0.0, 1.0), x))
 
     should_diverge = case[1]
 
@@ -91,7 +91,7 @@ def test_dynamic_integration_divergence(case):
     )
 
     # Initialize the state
-    direction = aet.as_tensor
+    direction = aet.as_tensor(1)
     step_size = aet.as_tensor(case[0])
     max_num_steps = aet.as_tensor(100)
     num_doublings = aet.as_tensor(10)
@@ -103,7 +103,7 @@ def test_dynamic_integration_divergence(case):
     initial_energy = initial_state[2] + kinetic_energy_fn(initial_state[1])
     termination_state = new_criterion_state(initial_state[0], num_doublings)
 
-    _ = trajectory_integrator(
+    state, updates = trajectory_integrator(
         srng,
         initial_state,
         direction,
@@ -113,4 +113,8 @@ def test_dynamic_integration_divergence(case):
         initial_energy,
     )
 
-    assert _ is should_diverge
+    state_fn = aesara.function((), state, updates=updates, on_unused_input="ignore")
+
+    is_diverging = state_fn()[-2]
+
+    assert is_diverging.item() is should_diverge
