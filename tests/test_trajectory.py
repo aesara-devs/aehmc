@@ -9,7 +9,11 @@ from aesara.tensor.var import TensorVariable
 from aehmc.integrators import new_integrator_state, velocity_verlet
 from aehmc.metrics import gaussian_metric
 from aehmc.termination import iterative_uturn
-from aehmc.trajectory import dynamic_integration, static_integration
+from aehmc.trajectory import (
+    dynamic_integration,
+    multiplicative_expansion,
+    static_integration,
+)
 
 
 def CircularMotion(inverse_mass_matrix):
@@ -118,3 +122,55 @@ def test_dynamic_integration_divergence(case):
     is_diverging = state_fn()[-2]
 
     assert is_diverging.item() is should_diverge
+
+
+@pytest.mark.parametrize(
+    "case",
+    [(0.0000000001, False, False, 10), (1, False, True, 2), (100000, True, True, 1)],
+)
+def test_multiplicative_expansion(case):
+    srng = RandomStream(seed=59)
+
+    def potential_fn(x):
+        return -0.5 * aet.sum(aet.square(x))
+
+    step_size, should_diverge, should_turn, expected_doublings = case
+    step_size = aet.as_tensor(step_size)
+    max_num_expansions = aet.constant(10)
+
+    # Set up the trajectory integrator
+    inverse_mass_matrix = aet.ones(1)
+    position = aet.as_tensor(np.zeros(1))
+
+    momentum_generator, kinetic_energy_fn, uturn_check_fn = gaussian_metric(
+        inverse_mass_matrix
+    )
+    integrator = velocity_verlet(potential_fn, kinetic_energy_fn)
+    (
+        new_criterion_state,
+        update_criterion_state,
+        is_criterion_met,
+    ) = iterative_uturn(uturn_check_fn)
+
+    trajectory_integrator = dynamic_integration(
+        integrator,
+        kinetic_energy_fn,
+        update_criterion_state,
+        is_criterion_met,
+        divergence_threshold=aet.as_tensor(1000),
+    )
+
+    expand = multiplicative_expansion(
+        trajectory_integrator, uturn_check_fn, step_size, max_num_expansions
+    )
+
+    # Create the initial state
+    state = new_integrator_state(potential_fn, position, momentum_generator(srng))
+    energy = state[2] + kinetic_energy_fn(state[1])
+    energy = state[2] + kinetic_energy_fn(state[1])
+    proposal = (state, energy, 0, -np.inf)
+    termination_state = new_criterion_state(state[0], 10)
+
+    result, updates = expand(srng, proposal, state, state, state[1], termination_state, energy)
+    fn = aesara.function((), result, updates=updates)
+    print(fn())

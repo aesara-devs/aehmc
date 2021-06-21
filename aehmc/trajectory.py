@@ -1,6 +1,7 @@
 from typing import Callable, Tuple
 
 import aesara
+import aesara.tensor as aet
 import numpy as np
 from aesara.scan.utils import until
 from aesara.tensor.random.utils import RandomStream
@@ -9,9 +10,12 @@ from aesara.tensor.var import TensorVariable
 from aehmc.integrators import IntegratorStateType
 from aehmc.proposals import (
     ProposalStateType,
+    progressive_biased_sampling,
     progressive_uniform_sampling,
     proposal_generator,
 )
+
+__all__ = ["static_integration", "dynamic_integration", "multiplicative_expansion"]
 
 TerminationStateType = Tuple[
     TensorVariable, TensorVariable, TensorVariable, TensorVariable
@@ -243,16 +247,237 @@ def dynamic_integration(
                 np.array(False),
                 np.array(False),
             ),
-            n_steps=max_num_steps,
+            n_steps=max_num_steps + 1,
         )
 
+        new_proposal = (
+            (traj[1][-1], traj[2][-1], traj[3][-1], traj[4][-1]),
+            traj[5],
+            traj[6],
+            traj[7],
+        )
+        new_state = (traj[8][-1], traj[9][-1], traj[10][-1], traj[11][-1])
+        subtree_momentum_sum = traj[12][-1]
+        new_termination_state = (traj[13][-1], traj[14][-1], traj[15][-1], traj[16][-1])
         is_diverging = traj[-2][-1]
         has_terminated = traj[-1][-1]
 
-        return (is_diverging, has_terminated), updates
+        return (
+            new_proposal,
+            new_state,
+            subtree_momentum_sum,
+            new_termination_state,
+            is_diverging,
+            has_terminated,
+        ), updates
 
     return integrate
 
 
-def multiplicative_expansion():
-    raise NotImplementedError
+def multiplicative_expansion(
+    trajectory_integrator: Callable,
+    uturn_check_fn: Callable,
+    step_size: TensorVariable,
+    max_num_expansions: TensorVariable,
+):
+    """Sample a trajectory and update the proposal sequentially
+    until the termination criterion is met.
+
+    """
+    proposal_sampler = progressive_biased_sampling
+
+    def expand(
+        srng,
+        proposal,
+        left_state,
+        right_state,
+        momentum_sum,
+        termination_state,
+        initial_energy,
+    ):
+        def expand_once(
+            step,
+            q_proposal,  # proposal
+            p_proposal,
+            potential_energy_proposal,
+            potential_energy_grad_proposal,
+            energy_proposal,
+            weight,
+            sum_log_p_accept,
+            q_left,  # trajectory
+            p_left,
+            potential_energy_left,
+            potential_energy_grad_left,
+            q_right,
+            p_right,
+            potential_energy_right,
+            potential_energy_grad_right,
+            momentum_sum,
+            momentum_ckpts,  # termination_state
+            momentum_sum_ckpts,
+            idx_min,
+            idx_max,
+        ):
+
+            left_state = (
+                q_left,
+                p_left,
+                potential_energy_left,
+                potential_energy_grad_left,
+            )
+            right_state = (
+                q_right,
+                p_right,
+                potential_energy_right,
+                potential_energy_grad_right,
+            )
+            proposal = (
+                (
+                    q_proposal,
+                    p_proposal,
+                    potential_energy_proposal,
+                    potential_energy_grad_proposal,
+                ),
+                energy_proposal,
+                weight,
+                sum_log_p_accept,
+            )
+            termination_state = (
+                momentum_ckpts,
+                momentum_sum_ckpts,
+                idx_min,
+                idx_max,
+            )
+
+            do_go_right = srng.bernoulli(0.5)
+            direction = aet.where(do_go_right, 1.0, -1.0)
+            start_state = where_state(do_go_right, right_state, left_state)
+
+            (
+                new_proposal,
+                new_state,
+                subtree_momentum_sum,
+                new_termination_state,
+                is_diverging,
+                is_subtree_turning,
+            ), updates = trajectory_integrator(
+                srng,
+                start_state,
+                direction,
+                termination_state,
+                2 ** step,
+                step_size,
+                initial_energy,
+            )
+
+            new_momentum_sum = momentum_sum + subtree_momentum_sum
+
+            # The trajectory integrator always integrates forward in time; we
+            # thus need to switch the states if the other direction was picked.
+            new_left_state = where_state(do_go_right, left_state, new_state)
+            new_right_state = where_state(do_go_right, new_state, right_state)
+
+            # Update the proposal If the termination criterion is reached in
+            # the subtree or if a divergence occurs we reject this subtree's
+            # proposal. We nevertheless update the sum of the logarithm of the
+            # acceptance probabilities to serve as an estimate for dual
+            # averaging.
+            updated_sum_log_p_accept = _logaddexp(proposal[3], new_proposal[3])
+            updated_proposal = (
+                proposal[0],
+                proposal[1],
+                proposal[2],
+                updated_sum_log_p_accept,
+            )
+
+            sampled_proposal = where_proposal(
+                is_diverging | is_subtree_turning,
+                updated_proposal,
+                proposal_sampler(srng, proposal, new_proposal),
+            )
+
+            # check if the trajectory is turning
+            is_turning = uturn_check_fn(
+                new_left_state[1], new_right_state[1], new_momentum_sum
+            )
+
+            do_stop_expanding = is_diverging | is_turning
+
+            return (
+                step + 1,
+                *sampled_proposal[0],
+                sampled_proposal[1],
+                sampled_proposal[2],
+                sampled_proposal[3],
+                *new_left_state,
+                *new_right_state,
+                new_momentum_sum,
+                *new_termination_state,
+            ), until(do_stop_expanding)
+
+        results, updates = aesara.scan(
+            expand_once,
+            outputs_info=(
+                0,
+                *proposal[0],
+                proposal[1],
+                proposal[2],
+                proposal[3],
+                *left_state,
+                *right_state,
+                momentum_sum,
+                *termination_state
+            ),
+            n_steps=max_num_expansions
+        )
+
+        return results, updates
+
+    return expand
+
+
+def where_state(
+    do_pick_left: bool,
+    left_state: IntegratorStateType,
+    right_state: IntegratorStateType,
+) -> IntegratorStateType:
+    """Represents a switch between two states depending on a condition."""
+    q_left, p_left, potential_energy_left, potential_energy_grad_left = left_state
+    q_right, p_right, potential_energy_right, potential_energy_grad_right = right_state
+
+    q = aet.where(do_pick_left, q_left, q_right)
+    p = aet.where(do_pick_left, p_left, p_right)
+    potential_energy = aet.where(
+        do_pick_left, potential_energy_left, potential_energy_right
+    )
+    potential_energy_grad = aet.where(
+        do_pick_left, potential_energy_grad_left, potential_energy_grad_right
+    )
+
+    return (q, p, potential_energy, potential_energy_grad)
+
+
+def where_proposal(
+    do_pick_left: bool,
+    left_proposal: ProposalStateType,
+    right_proposal: ProposalStateType,
+) -> ProposalStateType:
+    """Represents a switch between two proposals depending on a condition."""
+    left_state, left_weight, left_energy, left_log_sum_p_accept = left_proposal
+    right_state, right_weight, right_energy, right_log_sum_p_accept = right_proposal
+
+    state = where_state(do_pick_left, left_state, right_state)
+    energy = aet.where(do_pick_left, left_energy, right_energy)
+    weight = aet.where(do_pick_left, left_weight, right_weight)
+    log_sum_p_accept = aet.where(
+        do_pick_left, left_log_sum_p_accept, right_log_sum_p_accept
+    )
+
+    return (state, energy, weight, log_sum_p_accept)
+
+
+def _logaddexp(a, b):
+    diff = b - a
+    return aet.switch(
+        diff > 0, b + aet.log1p(aet.exp(-diff)), a + aet.log1p(aet.exp(-diff))
+    )

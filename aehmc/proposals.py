@@ -52,6 +52,19 @@ def progressive_uniform_sampling(
     return updated_proposal
 
 
+def progressive_biased_sampling(
+    srng: RandomStream, proposal: ProposalStateType, new_proposal: ProposalStateType
+) -> ProposalStateType:
+    state, energy, weight, sum_log_p_accept = proposal
+    new_state, new_energy, new_weight, new_sum_log_p_accept = new_proposal
+
+    p_accept = aet.clip(aet.exp(new_weight - weight), 0, 1)
+    do_accept = srng.bernoulli(p_accept)
+    updated_proposal = maybe_update_proposal(do_accept, proposal, new_proposal)
+
+    return updated_proposal
+
+
 def maybe_update_proposal(
     do_accept: bool, proposal: ProposalStateType, new_proposal: ProposalStateType
 ) -> ProposalStateType:
