@@ -80,6 +80,7 @@ def static_integration(
 
 
 def dynamic_integration(
+    srng: RandomStream,
     integrator: Callable,
     kinetic_energy: Callable,
     update_termination_state: Callable,
@@ -107,7 +108,6 @@ def dynamic_integration(
     sample_proposal = progressive_uniform_sampling
 
     def integrate(
-        srng: RandomStream,
         previous_last_state: IntegratorStateType,
         direction: TensorVariable,
         termination_state: TerminationStateType,
@@ -275,6 +275,7 @@ def dynamic_integration(
 
 
 def multiplicative_expansion(
+    srng: RandomStream,
     trajectory_integrator: Callable,
     uturn_check_fn: Callable,
     step_size: TensorVariable,
@@ -287,7 +288,6 @@ def multiplicative_expansion(
     proposal_sampler = progressive_biased_sampling
 
     def expand(
-        srng,
         proposal,
         left_state,
         right_state,
@@ -361,7 +361,6 @@ def multiplicative_expansion(
                 is_diverging,
                 is_subtree_turning,
             ), updates = trajectory_integrator(
-                srng,
                 start_state,
                 direction,
                 termination_state,
@@ -414,10 +413,8 @@ def multiplicative_expansion(
                 new_momentum_sum,
                 *new_termination_state,
             ), until(do_stop_expanding)
-
-        results, updates = aesara.scan(
-            expand_once,
-            outputs_info=(
+                
+        a = expand_once(
                 0,
                 *proposal[0],
                 proposal[1],
@@ -427,11 +424,25 @@ def multiplicative_expansion(
                 *right_state,
                 momentum_sum,
                 *termination_state
-            ),
-            n_steps=max_num_expansions
         )
 
-        return results, updates
+        # results, _ = aesara.scan(
+            # expand_once,
+            # outputs_info=(
+                # 0,
+                # *proposal[0],
+                # proposal[1],
+                # proposal[2],
+                # proposal[3],
+                # *left_state,
+                # *right_state,
+                # momentum_sum,
+                # *termination_state
+            # ),
+            # n_steps=max_num_expansions
+        # )
+
+        return a[0][1]
 
     return expand
 

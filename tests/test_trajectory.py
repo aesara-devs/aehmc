@@ -87,6 +87,7 @@ def test_dynamic_integration_divergence(case):
     ) = iterative_uturn(uturn_check_fn)
 
     trajectory_integrator = dynamic_integration(
+        srng,
         integrator,
         kinetic_energy_fn,
         update_criterion_state,
@@ -108,7 +109,6 @@ def test_dynamic_integration_divergence(case):
     termination_state = new_criterion_state(initial_state[0], num_doublings)
 
     state, updates = trajectory_integrator(
-        srng,
         initial_state,
         direction,
         termination_state,
@@ -153,6 +153,7 @@ def test_multiplicative_expansion(case):
     ) = iterative_uturn(uturn_check_fn)
 
     trajectory_integrator = dynamic_integration(
+        srng,
         integrator,
         kinetic_energy_fn,
         update_criterion_state,
@@ -161,7 +162,7 @@ def test_multiplicative_expansion(case):
     )
 
     expand = multiplicative_expansion(
-        trajectory_integrator, uturn_check_fn, step_size, max_num_expansions
+        srng, trajectory_integrator, uturn_check_fn, step_size, max_num_expansions
     )
 
     # Create the initial state
@@ -171,6 +172,6 @@ def test_multiplicative_expansion(case):
     proposal = (state, energy, 0, -np.inf)
     termination_state = new_criterion_state(state[0], 10)
 
-    result, updates = expand(srng, proposal, state, state, state[1], termination_state, energy)
-    fn = aesara.function((), result, updates=updates)
+    result = expand(proposal, state, state, state[1], termination_state, energy)
+    fn = aesara.function((), result)
     print(fn())
