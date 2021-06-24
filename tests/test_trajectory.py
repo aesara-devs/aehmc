@@ -117,9 +117,9 @@ def test_dynamic_integration_divergence(case):
         initial_energy,
     )
 
-    state_fn = aesara.function((), state, updates=updates, on_unused_input="ignore")
+    state_fn = aesara.function((), state[-2], updates=updates, on_unused_input="ignore")
 
-    is_diverging = state_fn()[-2]
+    is_diverging = state_fn()
 
     assert is_diverging.item() is should_diverge
 
