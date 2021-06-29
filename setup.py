@@ -11,7 +11,7 @@ setup(
     cmdclass=versioneer.get_cmdclass(),
     description="HMC samplers in Aesara",
     url="http://github.com/aesara-devs/aehmc",
-    maintainer="Brandon T. Willard",
+    maintainer="Aesara Developers",
     maintainer_email="aesara.devs@gmail.com",
     packages=["aehmc"],
     install_requires=[
@@ -19,6 +19,7 @@ setup(
         "scipy>=1.4.0",
         "numba",
         "aesara",
+        "aeppl>=0.0.5",
     ],
     tests_require=["pytest"],
     long_description=open("README.md").read() if exists("README.md") else "",
