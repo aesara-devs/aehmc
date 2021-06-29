@@ -412,37 +412,40 @@ def multiplicative_expansion(
                 *new_right_state,
                 new_momentum_sum,
                 *new_termination_state,
+                updates,
             ), until(do_stop_expanding)
-                
-        a = expand_once(
-                0,
-                *proposal[0],
-                proposal[1],
-                proposal[2],
-                proposal[3],
-                *left_state,
-                *right_state,
-                momentum_sum,
-                *termination_state
+
+        a, _ = expand_once(
+            0,
+            *proposal[0],
+            proposal[1],
+            proposal[2],
+            proposal[3],
+            *left_state,
+            *right_state,
+            momentum_sum,
+            *termination_state
         )
 
+        nsteps = a[3]
+        updates = a[-1]
         # results, _ = aesara.scan(
-            # expand_once,
-            # outputs_info=(
-                # 0,
-                # *proposal[0],
-                # proposal[1],
-                # proposal[2],
-                # proposal[3],
-                # *left_state,
-                # *right_state,
-                # momentum_sum,
-                # *termination_state
-            # ),
-            # n_steps=max_num_expansions
+        # expand_once,
+        # outputs_info=(
+        # 0,
+        # *proposal[0],
+        # proposal[1],
+        # proposal[2],
+        # proposal[3],
+        # *left_state,
+        # *right_state,
+        # momentum_sum,
+        # *termination_state
+        # ),
+        # n_steps=max_num_expansions
         # )
 
-        return a[0][1]
+        return nsteps, updates
 
     return expand
 

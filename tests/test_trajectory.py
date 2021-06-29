@@ -172,6 +172,9 @@ def test_multiplicative_expansion(case):
     proposal = (state, energy, 0, -np.inf)
     termination_state = new_criterion_state(state[0], 10)
 
-    result = expand(proposal, state, state, state[1], termination_state, energy)
-    fn = aesara.function((), result)
+    result, updates = expand(
+        proposal, state, state, state[1], termination_state, energy
+    )
+    fn = aesara.function((), result, updates=updates)
     print(fn())
+    assert False
