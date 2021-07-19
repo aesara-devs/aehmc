@@ -59,10 +59,10 @@ def test_hmc():
     inverse_mass_matrix = np.array([1.0])
 
     trajectory_generator = build_trajectory_generator(
-        srng, hmc.kernel, normal_logp, 10_000
+        srng, hmc.kernel, normal_logp, 50_000
     )
     positions, *_ = trajectory_generator(
         initial_position, step_size, inverse_mass_matrix, num_integration_steps
     )
 
-    assert np.mean(positions[9000:], axis=0) == pytest.approx(3, 1e-1)
+    assert np.mean(positions[10_000:], axis=0) == pytest.approx(3, 1e-1)
