@@ -12,7 +12,7 @@ def gaussian_metric(
     shape = aet.shape(inverse_mass_matrix)[0]
 
     if inverse_mass_matrix.ndim == 1:
-        mass_matrix_sqrt = aet.sqrt(aet.inv(inverse_mass_matrix))
+        mass_matrix_sqrt = aet.sqrt(aet.reciprocal(inverse_mass_matrix))
         dot, matmul = lambda x, y: x * y, lambda x, y: x * y
     elif inverse_mass_matrix.ndim == 2:
         tril_inv = slinalg.cholesky(inverse_mass_matrix)
