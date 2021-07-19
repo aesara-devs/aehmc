@@ -20,15 +20,13 @@ def kernel(
     divergence_threshold: int = 1000,
 ):
 
-    momentum_generator, kinetic_ernergy_fn, _ = metrics.gaussian_metric(
+    momentum_generator, kinetic_energy_fn, _ = metrics.gaussian_metric(
         inverse_mass_matrix
     )
-    symplectic_integrator = integrators.velocity_verlet(
-        potential_fn, kinetic_ernergy_fn
-    )
+    symplectic_integrator = integrators.velocity_verlet(potential_fn, kinetic_energy_fn)
     proposal_generator = hmc_proposal(
         symplectic_integrator,
-        kinetic_ernergy_fn,
+        kinetic_energy_fn,
         step_size,
         num_integration_steps,
         divergence_threshold,
