@@ -7,9 +7,9 @@ from aesara.tensor.random.utils import RandomStream
 from aehmc.metrics import gaussian_metric
 
 momentum_test_cases = [
-    (np.array([1.0]), -0.218),
-    (np.array([1.0, 1.0]), np.array([-0.218, 0.268])),
-    (np.array([[1.0, 0], [0, 1.0]]), np.array([-0.218, 0.268])),
+    (np.array([1.0]), 0.144),
+    (np.array([1.0, 1.0]), np.array([0.144, 1.27])),
+    (np.array([[1.0, 0], [0, 1.0]]), np.array([0.144, 1.27])),
 ]
 
 
