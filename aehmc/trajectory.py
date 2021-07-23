@@ -6,6 +6,8 @@ import numpy as np
 from aesara.scan.utils import until
 from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
+from aesara.updates import OrderedUpdates
+from collections import OrderedDict
 
 from aehmc.integrators import IntegratorStateType
 from aehmc.proposals import (
@@ -252,9 +254,9 @@ def dynamic_integration(
 
         new_proposal = (
             (traj[1][-1], traj[2][-1], traj[3][-1], traj[4][-1]),
-            traj[5],
-            traj[6],
-            traj[7],
+            traj[5][-1],
+            traj[6][-1],
+            traj[7][-1],
         )
         new_state = (traj[8][-1], traj[9][-1], traj[10][-1], traj[11][-1])
         subtree_momentum_sum = traj[12][-1]
@@ -360,7 +362,7 @@ def multiplicative_expansion(
                 new_termination_state,
                 is_diverging,
                 is_subtree_turning,
-            ), updates = trajectory_integrator(
+            ), inner_updates = trajectory_integrator(
                 start_state,
                 direction,
                 termination_state,
@@ -368,6 +370,8 @@ def multiplicative_expansion(
                 step_size,
                 initial_energy,
             )
+            for key, value in inner_updates.items():
+                key.default_update = value
 
             new_momentum_sum = momentum_sum + subtree_momentum_sum
 
@@ -412,40 +416,27 @@ def multiplicative_expansion(
                 *new_right_state,
                 new_momentum_sum,
                 *new_termination_state,
-                updates,
             ), until(do_stop_expanding)
 
-        a, _ = expand_once(
-            0,
-            *proposal[0],
-            proposal[1],
-            proposal[2],
-            proposal[3],
-            *left_state,
-            *right_state,
-            momentum_sum,
-            *termination_state
+        results, updates = aesara.scan(
+            expand_once,
+            outputs_info=(
+                0,
+                *proposal[0],
+                proposal[1],
+                proposal[2],
+                proposal[3],
+                *left_state,
+                *right_state,
+                momentum_sum,
+                *termination_state,
+            ),
+            n_steps=max_num_expansions,
         )
+        for key, value in updates.items():
+            key.default_update = value
 
-        nsteps = a[3]
-        updates = a[-1]
-        # results, _ = aesara.scan(
-        # expand_once,
-        # outputs_info=(
-        # 0,
-        # *proposal[0],
-        # proposal[1],
-        # proposal[2],
-        # proposal[3],
-        # *left_state,
-        # *right_state,
-        # momentum_sum,
-        # *termination_state
-        # ),
-        # n_steps=max_num_expansions
-        # )
-
-        return nsteps, updates
+        return results[3][-1], updates
 
     return expand
 

@@ -16,7 +16,7 @@ def proposal_generator(kinetic_energy: Callable, divergence_threshold: float):
     def init(state):
         _, p, potential_energy, _ = state
         energy = potential_energy + kinetic_energy(p)
-        return (state, energy, 0, -np.inf)
+        return (state, energy, 0.0, -np.inf)
 
     def update(initial_energy, state):
         q, p, potential_energy, _ = state
@@ -58,7 +58,7 @@ def progressive_biased_sampling(
     state, energy, weight, sum_log_p_accept = proposal
     new_state, new_energy, new_weight, new_sum_log_p_accept = new_proposal
 
-    p_accept = aet.clip(aet.exp(new_weight - weight), 0, 1)
+    p_accept = aet.clip(aet.exp(new_weight - weight), 0.0, 1.0)
     do_accept = srng.bernoulli(p_accept)
     updated_proposal = maybe_update_proposal(do_accept, proposal, new_proposal)
 

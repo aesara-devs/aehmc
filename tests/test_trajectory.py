@@ -126,7 +126,11 @@ def test_dynamic_integration_divergence(case):
 
 @pytest.mark.parametrize(
     "case",
-    [(0.0000000001, False, False, 10), (1, False, True, 2), (100000, True, True, 1)],
+    [
+        (0.0000000001, False, False, 10),
+        (1.0, False, True, 2),
+        (100000.0, True, True, 1),
+    ],
 )
 def test_multiplicative_expansion(case):
     srng = RandomStream(seed=59)
@@ -139,8 +143,8 @@ def test_multiplicative_expansion(case):
     max_num_expansions = aet.constant(10)
 
     # Set up the trajectory integrator
-    inverse_mass_matrix = aet.ones(1)
-    position = aet.as_tensor(np.zeros(1))
+    inverse_mass_matrix = aet.ones(1, dtype="float")
+    position = aet.as_tensor(np.zeros(1), dtype="float")
 
     momentum_generator, kinetic_energy_fn, uturn_check_fn = gaussian_metric(
         inverse_mass_matrix
@@ -169,7 +173,12 @@ def test_multiplicative_expansion(case):
     state = new_integrator_state(potential_fn, position, momentum_generator(srng))
     energy = state[2] + kinetic_energy_fn(state[1])
     energy = state[2] + kinetic_energy_fn(state[1])
-    proposal = (state, energy, 0, -np.inf)
+    proposal = (
+        state,
+        energy,
+        aet.as_tensor(0.0, dtype="float64"),
+        aet.as_tensor(-np.inf, dtype="float64"),
+    )
     termination_state = new_criterion_state(state[0], 10)
 
     result, updates = expand(
@@ -177,4 +186,3 @@ def test_multiplicative_expansion(case):
     )
     fn = aesara.function((), result, updates=updates)
     print(fn())
-    assert False
