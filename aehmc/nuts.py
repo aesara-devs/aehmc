@@ -1,3 +1,11 @@
+from typing import Callable
+
+import numpy as np
+from aesara.tensor.random.utils import RandomStream
+from aesara.tensor.var import TensorVariable
+
+import aehmc.integrators as integrators
+import aehmc.metrics as metrics
 from aehmc.termination import iterative_uturn
 from aehmc.trajectory import dynamic_integration, multiplicative_expansion
 
@@ -7,6 +15,7 @@ def kernel(
     potential_fn: Callable[[TensorVariable], TensorVariable],
     step_size: TensorVariable,
     inverse_mass_matrix: TensorVariable,
+    max_num_expansions: int = 10,
     divergence_threshold: int = 1000,
 ):
 
@@ -20,6 +29,7 @@ def kernel(
         uturn_check_fn
     )
     trajectory_integrator = dynamic_integration(
+        srng,
         symplectic_integrator,
         kinetic_ernergy_fn,
         update_termination_state,
@@ -27,6 +37,7 @@ def kernel(
         divergence_threshold,
     )
     expand = multiplicative_expansion(
+        srng,
         trajectory_integrator,
         uturn_check_fn,
         step_size,

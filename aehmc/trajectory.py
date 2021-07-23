@@ -6,8 +6,6 @@ import numpy as np
 from aesara.scan.utils import until
 from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
-from aesara.updates import OrderedUpdates
-from collections import OrderedDict
 
 from aehmc.integrators import IntegratorStateType
 from aehmc.proposals import (
