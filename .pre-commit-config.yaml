@@ -1,11 +1,16 @@
 exclude: |
     (?x)^(
         versioneer\.py|
-                aehmc/_version\.py|
+        aehmc/_version\.py|
         doc/.*|
         bin/.*
     )$
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v2.1.0
+    hooks:
+      - id: debug-statements
+      - id: check-merge-conflict
   - repo: https://github.com/psf/black
     rev: 20.8b1
     hooks:
@@ -24,3 +29,12 @@ repos:
     hooks:
       - id: mypy
         args: [--ignore-missing-imports]
+  - repo: https://github.com/humitos/mirrors-autoflake.git
+    rev: v1.1
+    hooks:
+      - id: autoflake
+        exclude: |
+          (?x)^(
+              .*/?__init__\.py
+          )$
+        args: ['--in-place', '--remove-all-unused-imports', '--remove-unused-variable']
