@@ -416,6 +416,18 @@ def multiplicative_expansion(
                 *new_termination_state,
             ), until(do_stop_expanding)
 
+        # results, _ = expand_once(
+        #     0,
+        #     *proposal[0],
+        #     proposal[1],
+        #     proposal[2],
+        #     proposal[3],
+        #     *left_state,
+        #     *right_state,
+        #     momentum_sum,
+        #     *termination_state,
+        # )
+
         results, updates = aesara.scan(
             expand_once,
             outputs_info=(
@@ -434,7 +446,7 @@ def multiplicative_expansion(
         for key, value in updates.items():
             key.default_update = value
 
-        return results[3][-1], updates
+        return results[1:], updates
 
     return expand
 

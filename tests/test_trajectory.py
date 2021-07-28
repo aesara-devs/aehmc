@@ -144,7 +144,7 @@ def test_multiplicative_expansion(case):
 
     # Set up the trajectory integrator
     inverse_mass_matrix = aet.ones(1, dtype="float")
-    position = aet.as_tensor(np.zeros(1), dtype="float")
+    position = aet.zeros(1, dtype="float")
 
     momentum_generator, kinetic_energy_fn, uturn_check_fn = gaussian_metric(
         inverse_mass_matrix
@@ -172,17 +172,40 @@ def test_multiplicative_expansion(case):
     # Create the initial state
     state = new_integrator_state(potential_fn, position, momentum_generator(srng))
     energy = state[2] + kinetic_energy_fn(state[1])
-    energy = state[2] + kinetic_energy_fn(state[1])
     proposal = (
         state,
         energy,
         aet.as_tensor(0.0, dtype="float64"),
-        aet.as_tensor(-np.inf, dtype="float64"),
+        aet.as_tensor([-np.inf], dtype="float64"),
     )
     termination_state = new_criterion_state(state[0], 10)
-
     result, updates = expand(
         proposal, state, state, state[1], termination_state, energy
     )
     fn = aesara.function((), result, updates=updates)
-    print(fn())
+    res = fn()
+    print(
+        [
+            np.shape(state[0].eval()),
+            np.shape(state[1].eval()),
+            np.shape(state[2].eval()),
+            np.shape(state[3].eval()),
+            np.shape(proposal[1].eval()),
+            np.shape(proposal[2].eval()),
+            np.shape(proposal[3].eval()),
+            np.shape(state[0].eval()),
+            np.shape(state[1].eval()),
+            np.shape(state[2].eval()),
+            np.shape(state[3].eval()),
+            np.shape(state[0].eval()),
+            np.shape(state[1].eval()),
+            np.shape(state[2].eval()),
+            np.shape(state[3].eval()),
+            np.shape(state[1].eval()),
+            np.shape(termination_state[0].eval()),
+            np.shape(termination_state[1].eval()),
+            np.shape(termination_state[2].eval()),
+            np.shape(termination_state[3].eval()),
+        ]
+    )
+    print([np.shape(r) for r in res])
