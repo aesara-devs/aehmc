@@ -3,13 +3,14 @@ from typing import Callable, Tuple
 import aesara.tensor as aet
 import aesara.tensor.slinalg as slinalg
 from aesara.tensor.random.utils import RandomStream
+from aesara.tensor.shape import shape_tuple
 from aesara.tensor.var import TensorVariable
 
 
 def gaussian_metric(
     inverse_mass_matrix: TensorVariable,
 ) -> Tuple[Callable, Callable, Callable]:
-    shape = aet.shape(inverse_mass_matrix)[0]
+    shape = [shape_tuple(inverse_mass_matrix)[0]]
 
     if inverse_mass_matrix.ndim == 1:
         mass_matrix_sqrt = aet.sqrt(aet.reciprocal(inverse_mass_matrix))

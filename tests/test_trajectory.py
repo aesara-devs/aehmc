@@ -15,6 +15,9 @@ from aehmc.trajectory import (
     static_integration,
 )
 
+aesara.config.optimizer = "fast_compile"
+aesara.config.exception_verbosity = "high"
+
 
 def CircularMotion(inverse_mass_matrix):
     def potential_energy(q: TensorVariable) -> TensorVariable:
@@ -140,11 +143,11 @@ def test_multiplicative_expansion(case):
 
     step_size, should_diverge, should_turn, expected_doublings = case
     step_size = aet.as_tensor(step_size)
-    max_num_expansions = aet.constant(10)
+    max_num_expansions = aet.constant(10, dtype="int8")
 
     # Set up the trajectory integrator
-    inverse_mass_matrix = aet.ones(1, dtype="float")
-    position = aet.zeros(1, dtype="float")
+    inverse_mass_matrix = aet.ones(1, dtype="float64")
+    position = aet.zeros(1, dtype="float64")
 
     momentum_generator, kinetic_energy_fn, uturn_check_fn = gaussian_metric(
         inverse_mass_matrix
@@ -183,29 +186,9 @@ def test_multiplicative_expansion(case):
         proposal, state, state, state[1], termination_state, energy
     )
     fn = aesara.function((), result, updates=updates)
-    res = fn()
-    print(
-        [
-            np.shape(state[0].eval()),
-            np.shape(state[1].eval()),
-            np.shape(state[2].eval()),
-            np.shape(state[3].eval()),
-            np.shape(proposal[1].eval()),
-            np.shape(proposal[2].eval()),
-            np.shape(proposal[3].eval()),
-            np.shape(state[0].eval()),
-            np.shape(state[1].eval()),
-            np.shape(state[2].eval()),
-            np.shape(state[3].eval()),
-            np.shape(state[0].eval()),
-            np.shape(state[1].eval()),
-            np.shape(state[2].eval()),
-            np.shape(state[3].eval()),
-            np.shape(state[1].eval()),
-            np.shape(termination_state[0].eval()),
-            np.shape(termination_state[1].eval()),
-            np.shape(termination_state[2].eval()),
-            np.shape(termination_state[3].eval()),
-        ]
-    )
-    print([np.shape(r) for r in res])
+    result = fn()
+
+    n_doublings = result[0][-1]
+    diverges = result[-2][-1]
+    turns = result[-1][-1]
+    print(n_doublings, diverges, turns)

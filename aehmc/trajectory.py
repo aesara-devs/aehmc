@@ -3,6 +3,7 @@ from typing import Callable, Tuple
 import aesara
 import aesara.tensor as aet
 import numpy as np
+from aesara.ifelse import ifelse
 from aesara.scan.utils import until
 from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
@@ -233,10 +234,11 @@ def dynamic_integration(
             previous_last_state, termination_state
         )
 
+        integration_step = aet.as_tensor_variable(np.array(1, dtype=np.int32))
         traj, updates = aesara.scan(
             add_one_state,
             outputs_info=(
-                2,
+                integration_step,
                 *initial_proposal[0],
                 initial_proposal[1],
                 initial_proposal[2],
@@ -317,6 +319,8 @@ def multiplicative_expansion(
             momentum_sum_ckpts,
             idx_min,
             idx_max,
+            is_diverging,
+            has_terminated,
         ):
 
             left_state = (
@@ -359,7 +363,7 @@ def multiplicative_expansion(
                 subtree_momentum_sum,
                 new_termination_state,
                 is_diverging,
-                is_subtree_turning,
+                has_subtree_terminated,
             ), inner_updates = trajectory_integrator(
                 start_state,
                 direction,
@@ -392,7 +396,7 @@ def multiplicative_expansion(
             )
 
             sampled_proposal = where_proposal(
-                is_diverging | is_subtree_turning,
+                is_diverging | has_subtree_terminated,
                 updated_proposal,
                 proposal_sampler(srng, proposal, new_proposal),
             )
@@ -414,24 +418,15 @@ def multiplicative_expansion(
                 *new_right_state,
                 new_momentum_sum,
                 *new_termination_state,
+                is_diverging,
+                is_turning,
             ), until(do_stop_expanding)
 
-        # results, _ = expand_once(
-        #     0,
-        #     *proposal[0],
-        #     proposal[1],
-        #     proposal[2],
-        #     proposal[3],
-        #     *left_state,
-        #     *right_state,
-        #     momentum_sum,
-        #     *termination_state,
-        # )
-
+        expansion_step = aet.as_tensor_variable(np.array(0, dtype=np.int32))
         results, updates = aesara.scan(
             expand_once,
             outputs_info=(
-                0,
+                expansion_step,
                 *proposal[0],
                 proposal[1],
                 proposal[2],
@@ -440,13 +435,15 @@ def multiplicative_expansion(
                 *right_state,
                 momentum_sum,
                 *termination_state,
+                np.array(False),
+                np.array(False),
             ),
             n_steps=max_num_expansions,
         )
         for key, value in updates.items():
             key.default_update = value
 
-        return results[1:], updates
+        return results, updates
 
     return expand
 
@@ -460,12 +457,12 @@ def where_state(
     q_left, p_left, potential_energy_left, potential_energy_grad_left = left_state
     q_right, p_right, potential_energy_right, potential_energy_grad_right = right_state
 
-    q = aet.where(do_pick_left, q_left, q_right)
-    p = aet.where(do_pick_left, p_left, p_right)
+    q = ifelse(do_pick_left, q_left, q_right)
+    p = ifelse(do_pick_left, p_left, p_right)
     potential_energy = aet.where(
         do_pick_left, potential_energy_left, potential_energy_right
     )
-    potential_energy_grad = aet.where(
+    potential_energy_grad = ifelse(
         do_pick_left, potential_energy_grad_left, potential_energy_grad_right
     )
 
@@ -484,7 +481,7 @@ def where_proposal(
     state = where_state(do_pick_left, left_state, right_state)
     energy = aet.where(do_pick_left, left_energy, right_energy)
     weight = aet.where(do_pick_left, left_weight, right_weight)
-    log_sum_p_accept = aet.where(
+    log_sum_p_accept = ifelse(
         do_pick_left, left_log_sum_p_accept, right_log_sum_p_accept
     )
 

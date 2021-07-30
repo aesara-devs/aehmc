@@ -45,7 +45,7 @@ def progressive_uniform_sampling(
     state, energy, weight, sum_log_p_accept = proposal
     new_state, new_energy, new_weight, new_sum_log_p_accept = new_proposal
 
-    p_accept = aet.expit(new_weight - weight)
+    p_accept = aet.clip(aet.expit(new_weight - weight), 0.0, 1.0)
     do_accept = srng.bernoulli(p_accept)
     updated_proposal = maybe_update_proposal(do_accept, proposal, new_proposal)
 
