@@ -17,8 +17,8 @@ setup(
     install_requires=[
         "numpy>=1.18.1",
         "scipy>=1.4.0",
-        "aesara",
-        "aeppl>=0.0.5",
+        "aesara>=2.2.0",
+        "aeppl>=0.0.9",
     ],
     tests_require=["pytest"],
     long_description=open("README.md").read() if exists("README.md") else "",
