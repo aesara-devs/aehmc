@@ -17,7 +17,6 @@ setup(
     install_requires=[
         "numpy>=1.18.1",
         "scipy>=1.4.0",
-        "numba",
         "aesara",
     ],
     tests_require=["pytest"],
