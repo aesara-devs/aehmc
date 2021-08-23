@@ -13,7 +13,7 @@ import aehmc.trajectory as trajectory
 
 def kernel(
     srng: RandomStream,
-    potential_fn: Callable[[TensorVariable], TensorVariable],
+    logprob_fn: TensorVariable,
     step_size: TensorVariable,
     inverse_mass_matrix: TensorVariable,
     num_integration_steps: TensorVariable,
@@ -25,8 +25,9 @@ def kernel(
     ----------
     srng
         RandomStream object.
-    potential_fn
-        A function that returns the potential energy of a chain at a given position.
+    logprob_fn
+        A function that returns the value of the log-probability density
+        function of a chain at a given position.
     step_size
         The step size used in the symplectic integrator
     inverse_mass_matrix
@@ -45,6 +46,9 @@ def kernel(
 
 
     """
+
+    def potential_fn(x):
+        return -logprob_fn(x)
 
     momentum_generator, kinetic_energy_fn, _ = metrics.gaussian_metric(
         inverse_mass_matrix
