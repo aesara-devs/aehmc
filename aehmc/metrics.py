@@ -64,7 +64,7 @@ def gaussian_metric(
 
     def momentum_generator(srng: RandomStream) -> TensorVariable:
         norm_samples = srng.normal(0, 1, size=shape)
-        momentum = dot(norm_samples, mass_matrix_sqrt)
+        momentum = dot(mass_matrix_sqrt, norm_samples)
         return momentum
 
     def kinetic_energy(momentum: TensorVariable) -> TensorVariable:
