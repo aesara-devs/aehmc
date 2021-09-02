@@ -13,7 +13,7 @@ from aehmc.trajectory import dynamic_integration, multiplicative_expansion
 
 def kernel(
     srng: RandomStream,
-    potential_fn: Callable[[TensorVariable], TensorVariable],
+    logprob_fn: Callable[[TensorVariable], TensorVariable],
     step_size: TensorVariable,
     inverse_mass_matrix: TensorVariable,
     max_num_expansions: int = aet.as_tensor(10),
@@ -47,6 +47,10 @@ def kernel(
     A function which, given a chain state, returns a new chain state.
 
     """
+
+    def potential_fn(x):
+        return -logprob_fn(x)
+
     momentum_generator, kinetic_ernergy_fn, uturn_check_fn = metrics.gaussian_metric(
         inverse_mass_matrix
     )
@@ -100,13 +104,12 @@ def kernel(
             key.default_update = value
 
         q_new = result[1][-1]
-        p_new = result[2][-1]
+        result[2][-1]
         potential_energy_new = result[3][-1]
         potential_energy_grad_new = result[4][-1]
 
         return (
             q_new,
-            p_new,
             potential_energy_new,
             potential_energy_grad_new,
             result[-1][-1],
