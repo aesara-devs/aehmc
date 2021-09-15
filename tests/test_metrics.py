@@ -7,7 +7,8 @@ from aesara.tensor.random.utils import RandomStream
 from aehmc.metrics import gaussian_metric
 
 momentum_test_cases = [
-    (np.array([1.0]), 0.144),
+    (1.0, 0.144),
+    (np.array([1.0]), np.array([0.144])),
     (np.array([1.0, 1.0]), np.array([0.144, 1.27])),
     (np.array([[1.0, 0], [0, 1.0]]), np.array([0.144, 1.27])),
 ]
@@ -19,16 +20,13 @@ def test_gaussian_metric_momentum(case):
     inverse_mass_matrix_val, expected_momentum = case
 
     # Momentum
-    if inverse_mass_matrix_val.ndim == 1:
-        inverse_mass_matrix = aet.vector("inverse_mass_matrix")
-    else:
-        inverse_mass_matrix = aet.matrix("inverse_mass_matrix")
-    momentum_fn, _, _ = gaussian_metric(inverse_mass_matrix)
+    momentum_fn, _, _ = gaussian_metric(aet.as_tensor(inverse_mass_matrix_val))
     srng = RandomStream(seed=59)
-    momentum_generator = aesara.function([inverse_mass_matrix], momentum_fn(srng))
-    assert momentum_generator(inverse_mass_matrix_val) == pytest.approx(
-        expected_momentum, 1e-2
-    )
+    momentum_generator = aesara.function([], momentum_fn(srng))
+    generated_momentum = momentum_generator()
+
+    assert np.shape(generated_momentum) == np.shape(expected_momentum)
+    assert generated_momentum == pytest.approx(expected_momentum, 1e-2)
 
 
 kinetic_energy_test_cases = [

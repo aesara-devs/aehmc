@@ -47,12 +47,20 @@ def gaussian_metric(
             Information. Springer, Berlin, Heidelberg, 2013.
 
     """
-    shape = shape_tuple(inverse_mass_matrix)[0]
 
-    if inverse_mass_matrix.ndim == 1:
+    # When the argument to `logprob_fn` is a scalar, so must be the inverse mass matrix
+    # and the momentum.
+    try:
+        shape = shape_tuple(inverse_mass_matrix)[0]
+        ndim = inverse_mass_matrix.ndim
+    except (AttributeError, IndexError):
+        shape = None
+        ndim = 1
+
+    if ndim == 1:
         mass_matrix_sqrt = aet.sqrt(aet.reciprocal(inverse_mass_matrix))
         dot, matmul = lambda x, y: x * y, lambda x, y: x * y
-    elif inverse_mass_matrix.ndim == 2:
+    elif ndim == 2:
         tril_inv = slinalg.cholesky(inverse_mass_matrix)
         identity = aet.eye(shape)
         mass_matrix_sqrt = slinalg.solve_lower_triangular(tril_inv, identity)
