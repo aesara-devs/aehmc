@@ -63,9 +63,14 @@ def velocity_verlet(
         kinetic_grad = aesara.grad(kinetic_energy_fn(new_momentum), new_momentum)
         new_position = position + a2 * step_size * kinetic_grad
 
-        new_potential_energy = potential_fn(new_position)
-        new_potential_energy_grad = aesara.grad(new_potential_energy, new_position)
-        new_momentum = new_momentum - b1 * step_size * new_potential_energy_grad
+        pos = position.clone()
+        npe = potential_fn(pos)
+        npeg = aesara.grad(npe, pos)
+        nm = new_momentum - b1 * step_size * npeg
+
+        new_momentum = aesara.clone_replace(nm, {pos: new_position})
+        new_potential_energy = aesara.clone_replace(npe, {pos: new_position})
+        new_potential_energy_grad = aesara.clone_replace(npeg, {pos: new_position})
 
         return (
             new_position,
