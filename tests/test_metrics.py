@@ -7,6 +7,7 @@ from aesara.tensor.random.utils import RandomStream
 from aehmc.metrics import gaussian_metric
 
 momentum_test_cases = [
+    (1.0, 0.144),
     (np.array([1.0]), 0.144),
     (np.array([1.0, 1.0]), np.array([0.144, 1.27])),
     (np.array([[1.0, 0], [0, 1.0]]), np.array([0.144, 1.27])),
@@ -19,7 +20,9 @@ def test_gaussian_metric_momentum(case):
     inverse_mass_matrix_val, expected_momentum = case
 
     # Momentum
-    if inverse_mass_matrix_val.ndim == 1:
+    if np.ndim(inverse_mass_matrix_val) == 0:
+        inverse_mass_matrix = aet.scalar("inverse_mass_matrix")
+    elif np.ndim(inverse_mass_matrix_val) == 1:
         inverse_mass_matrix = aet.vector("inverse_mass_matrix")
     else:
         inverse_mass_matrix = aet.matrix("inverse_mass_matrix")
