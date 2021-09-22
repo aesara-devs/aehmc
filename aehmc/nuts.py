@@ -5,15 +5,14 @@ import numpy as np
 from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
 
-import aehmc.integrators as integrators
-import aehmc.metrics as metrics
+from aehmc import integrators, metrics
 from aehmc.termination import iterative_uturn
 from aehmc.trajectory import dynamic_integration, multiplicative_expansion
 
 
 def kernel(
     srng: RandomStream,
-    potential_fn: Callable[[TensorVariable], TensorVariable],
+    logprob_fn: Callable[[TensorVariable], TensorVariable],
     step_size: TensorVariable,
     inverse_mass_matrix: TensorVariable,
     max_num_expansions: int = aet.as_tensor(10),
@@ -26,9 +25,9 @@ def kernel(
     ----------
     srng
         RandomStream object.
-    potential_fn
-        A function that returns the potential energy of a chain at a given position. The potential energy
-        is defined as minus the log-probability.
+    logprob_fn
+        A function that returns the value of the log-probability density
+        function of a chain at a given position.
     step_size
         The step size used in the symplectic integrator
     inverse_mass_matrix
@@ -47,6 +46,10 @@ def kernel(
     A function which, given a chain state, returns a new chain state.
 
     """
+
+    def potential_fn(x):
+        return -logprob_fn(x)
+
     momentum_generator, kinetic_ernergy_fn, uturn_check_fn = metrics.gaussian_metric(
         inverse_mass_matrix
     )
