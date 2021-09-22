@@ -7,23 +7,26 @@ import pytest
 from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
 
-import aehmc.hmc as hmc
-import aehmc.nuts as nuts
+from aehmc import hmc, nuts
 
 
 def normal_logprob(q: TensorVariable):
     return -aet.sum(aet.square(q - 3.0))
 
 
+def normal_potential(q: TensorVariable):
+    return -normal_logprob(q)
+
+
 def build_hmc_trajectory_generator(
     srng: RandomStream,
     kernel_generator: Callable,
+    state_generator: Callable,
     logprob_fn: Callable,
     num_states: int,
 ) -> Callable:
     q = aet.vector("q")
-    potential_energy = -logprob_fn(q)
-    potential_energy_grad = aesara.grad(potential_energy, wrt=q)
+    initial_state = state_generator(q, logprob_fn)
 
     step_size = aet.scalar("step_size")
     inverse_mass_matrix = aet.vector("inverse_mass_matrix")
@@ -36,9 +39,9 @@ def build_hmc_trajectory_generator(
     trajectory, updates = aesara.scan(
         fn=kernel,
         outputs_info=[
-            {"initial": q},
-            {"initial": potential_energy},
-            {"initial": potential_energy_grad},
+            {"initial": initial_state[0]},
+            {"initial": initial_state[1]},
+            {"initial": initial_state[2]},
         ],
         n_steps=num_states,
     )
@@ -60,7 +63,7 @@ def test_hmc():
     inverse_mass_matrix = np.array([1.0])
 
     trajectory_generator = build_hmc_trajectory_generator(
-        srng, hmc.kernel, normal_logprob, 50_000
+        srng, hmc.kernel, hmc.new_state, normal_logprob, 50_000
     )
     positions, *_ = trajectory_generator(
         initial_position, step_size, inverse_mass_matrix, num_integration_steps
@@ -74,14 +77,13 @@ def test_nuts():
     srng = RandomStream(seed=59)
 
     q = aet.vector("q")
-    potential_energy = -normal_logprob(q)
-    potential_energy_grad = aesara.grad(potential_energy, wrt=q)
+    initial_state = nuts.new_state(q, normal_logprob)
 
     step_size = aet.scalar("step_size", dtype="float64")
     inverse_mass_matrix = aet.vector("inverse_mass_matrix", dtype="float64")
 
     kernel = nuts.kernel(srng, normal_logprob, step_size, inverse_mass_matrix)
-    result, updates = kernel(q, potential_energy, potential_energy_grad)
+    result, updates = kernel(*initial_state)
 
     trajectory_generator = aesara.function(
         (q, step_size, inverse_mass_matrix),

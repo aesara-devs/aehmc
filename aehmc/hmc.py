@@ -1,5 +1,6 @@
 from typing import Callable
 
+import aesara
 import aesara.tensor as aet
 import numpy as np
 from aesara.ifelse import ifelse
@@ -9,6 +10,12 @@ from aesara.tensor.var import TensorVariable
 import aehmc.integrators as integrators
 import aehmc.metrics as metrics
 import aehmc.trajectory as trajectory
+
+
+def new_state(q: TensorVariable, logprob_fn: Callable):
+    potential_energy = -logprob_fn(q)
+    potential_energy_grad = aesara.grad(potential_energy, wrt=q)
+    return q, potential_energy, potential_energy_grad
 
 
 def kernel(
