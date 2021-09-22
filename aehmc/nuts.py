@@ -5,9 +5,11 @@ import numpy as np
 from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
 
-from aehmc import integrators, metrics
+from aehmc import hmc, integrators, metrics
 from aehmc.termination import iterative_uturn
 from aehmc.trajectory import dynamic_integration, multiplicative_expansion
+
+new_state = hmc.new_state
 
 
 def kernel(

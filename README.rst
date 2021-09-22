@@ -39,10 +39,9 @@ Example
   
   # Compile a function that updates the chain
   y_vv = Y_rv.clone()
-  potential_energy = -logprob_fn(y_vv)
-  potential_energy_grad = aesara.grad(potential_energy, wrt=y_vv)
+  initial_state = hmc.new_state(y_vv, logprob_fn)
 
-  next_step = kernel(y_vv, potential_energy, potential_energy_grad)
+  next_step = kernel(*initial_state)
   print(next_step[0].eval({y_vv: 0}))
 
 
