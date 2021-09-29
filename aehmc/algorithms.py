@@ -1,0 +1,101 @@
+from typing import Callable, Tuple
+
+import aesara.tensor as at
+from aesara.tensor.var import TensorVariable
+
+
+def dual_averaging(
+    mu: float = 0.5, gamma: float = 0.05, t0: int = 10, kappa: float = 0.75
+) -> Tuple[Callable, Callable]:
+    """Dual averaging algorithm.
+
+    Dual averaging is an algorithm for stochastic optimization that was
+    originally proposed by Nesterov in [1]_.
+
+    The update scheme we implement here is more elaborate than the one
+    described in [1]_. We follow [2]_ and add the parameters `t_0` and `kappa`
+    which respectively improves the stability of computations in early
+    iterations and set how fast the algorithm should forget past iterates.
+
+    The default values for the parameters are taken from the Stan implementation [3]_.
+
+    Parameters
+    ----------
+    mu
+        Chosen points towards which the successive iterates are shrunk.
+    gamma
+        Controls the amount of shrinkage towards mu.
+    t0
+        Improves the stability of computations early on.
+    kappa
+        Controls how fast the algorithm should forget past iterates.
+
+    References
+    ----------
+    .. [1]: Nesterov, Y. (2009). Primal-dual subgradient methods for convex
+            problems. Mathematical programming, 120(1), 221-259.
+
+    .. [2]: Hoffman, M. D., & Gelman, A. (2014). The No-U-Turn sampler:
+            adaptively setting path lengths in Hamiltonian Monte Carlo. J. Mach. Learn.
+            Res., 15(1), 1593-1623.
+
+    .. [3]: Carpenter, B., Gelman, A., Hoffman, M. D., Lee, D., Goodrich, B.,
+            Betancourt, M., ... & Riddell, A. (2017). Stan: A probabilistic programming
+            language. Journal of statistical software, 76(1), 1-32.
+
+    """
+
+    def init(
+        x: TensorVariable,
+    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable]:
+        step = at.as_tensor(1, "step", dtype="int32")
+        gradient_avg = at.as_tensor(0, "gradient_avg", dtype=x.dtype)
+        x_avg = at.as_tensor(0.0, "x_avg", dtype=x.dtype)
+        return step, x_avg, gradient_avg
+
+    def update(
+        gradient: TensorVariable,
+        step: TensorVariable,
+        x: TensorVariable,
+        x_avg: TensorVariable,
+        gradient_avg: TensorVariable,
+    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable, TensorVariable]:
+        """Update the state of the Dual Averaging algorithm.
+
+        Parameters
+        ----------
+        gradient
+            The current value of the stochastic gradient. Replaced by a
+            statistic to optimize in the case of MCMC adaptation.
+        step
+            The number of the current step in the optimization process.
+        x
+            The current value of the iterate.
+        x_avg
+            The current value of the averaged iterates.
+        gradient_avg
+            The current value of the averaged gradients.
+
+        Returns
+        -------
+        Updated values for the step number, iterate, averaged iterates and
+        averaged gradients.
+
+        """
+
+        eta = 1.0 / (step + t0)
+        new_gradient_avg = (1.0 - eta) * gradient_avg + eta * gradient
+
+        new_x = mu - (at.sqrt(step) / gamma) * new_gradient_avg
+
+        x_eta = step ** (-kappa)
+        new_x_avg = x_eta * x + (1.0 - x_eta) * x_avg
+
+        return (
+            step + 1,
+            new_x.astype("floatX"),
+            new_x_avg.astype("floatX"),
+            new_gradient_avg.astype("floatX"),
+        )
+
+    return init, update
