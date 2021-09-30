@@ -99,3 +99,85 @@ def dual_averaging(
         )
 
     return init, update
+
+
+def welford_covariance(compute_covariance: bool):
+    """Welford's online estimator of variance/covariance.
+
+    It is possible to compute the variance of a population of values in an
+    on-line fashion to avoid storing intermediate results. The naive recurrence
+    relations between the sample mean and variance at a step and the next are
+    however not numerically stable.
+
+    Welford's algorithm uses the sum of square of differences
+    :math:`M_{2,n} = \\sum_{i=1}^n \\left(x_i-\\overline{x_n}\right)^2`
+    for updating where :math:`x_n` is the current mean and the following
+    recurrence relationships
+
+    Parameters
+    ----------
+    compute_covariance
+        When True the algorithm returns a covariance matrix, otherwise returns
+        a variance vector.
+
+    """
+
+    def init(n_dims: int):
+        """Initialize the variance estimation.
+
+        Parameters
+        ----------
+        n_dims: int
+            The number of dimensions of the problem.
+
+        """
+        sample_size = at.as_tensor(0, dtype="int32")
+
+        if n_dims == 0:
+            return at.as_tensor(0), at.as_tensor(0), sample_size
+
+        mean = at.zeros((n_dims,))
+        if compute_covariance:
+            m2 = at.zeros((n_dims, n_dims))
+        else:
+            m2 = at.zeros((n_dims,))
+        return mean, m2, sample_size
+
+    def update(
+        value: TensorVariable,
+        mean: TensorVariable,
+        m2: TensorVariable,
+        sample_size: TensorVariable,
+    ):
+        """Update the averages and M2 matrix using the new value.
+
+        Parameters
+        ----------
+        value: Array, shape (1,)
+            The new sample (typically position of the chain) used to update m2
+        mean
+            The running average along each dimension
+        m2
+            The running value of the unnormalized variance/covariance
+        sample_size
+            The number of points that have currently been used to compute `mean` and `m2`.
+
+        """
+        sample_size = sample_size + 1
+
+        delta = value - mean
+        mean = mean + delta / sample_size
+        updated_delta = value - mean
+        if compute_covariance:
+            m2 = m2 + at.outer(updated_delta, delta)
+        else:
+            m2 = m2 + updated_delta * delta
+
+        return mean, m2, sample_size
+
+    def final(m2, sample_size):
+        """Compute the covariance"""
+        variance_or_covariance = m2 / (sample_size - 1)
+        return variance_or_covariance
+
+    return init, update, final
