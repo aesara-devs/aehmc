@@ -49,15 +49,15 @@ def gaussian_metric(
     """
 
     if inverse_mass_matrix.ndim == 0:
-        shape = ()
+        shape: Tuple = ()
         mass_matrix_sqrt = aet.sqrt(aet.reciprocal(inverse_mass_matrix))
         dot, matmul = lambda x, y: x * y, lambda x, y: x * y
     elif inverse_mass_matrix.ndim == 1:
-        shape = shape_tuple(inverse_mass_matrix)[0]
+        shape = (shape_tuple(inverse_mass_matrix)[0],)
         mass_matrix_sqrt = aet.sqrt(aet.reciprocal(inverse_mass_matrix))
         dot, matmul = lambda x, y: x * y, lambda x, y: x * y
     elif inverse_mass_matrix.ndim == 2:
-        shape = shape_tuple(inverse_mass_matrix)[0]
+        shape = (shape_tuple(inverse_mass_matrix)[0],)
         tril_inv = slinalg.cholesky(inverse_mass_matrix)
         identity = aet.eye(*shape)
         mass_matrix_sqrt = slinalg.solve_lower_triangular(tril_inv, identity)
