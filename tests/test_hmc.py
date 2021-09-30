@@ -87,6 +87,7 @@ def test_nuts():
         (q, step_size, inverse_mass_matrix),
         result,
         updates=updates,
+        allow_input_downcast=True,
     )
 
     step_size = 0.01
