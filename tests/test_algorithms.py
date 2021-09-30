@@ -1,5 +1,6 @@
 import aesara
 import aesara.tensor as at
+import numpy as np
 import pytest
 
 from aehmc import algorithms
@@ -34,3 +35,64 @@ def test_dual_averaging():
 
     last_x_avg = states[1].eval()[-1]
     assert last_x_avg == pytest.approx(1.0, 1e-2)
+
+
+@pytest.mark.parametrize("n_dim", [1, 3])
+@pytest.mark.parametrize("do_compute_covariance", [True, False])
+def test_welford_constant(n_dim, do_compute_covariance):
+    num_samples = 10
+    sample = at.ones(n_dim)  # constant samples
+
+    init, update, final = algorithms.welford_covariance(do_compute_covariance)
+    state = init(n_dim)
+    for _ in range(num_samples):
+        state = update(sample, *state)
+
+    mean = state[0].eval()
+    expected = np.ones(n_dim)
+    np.testing.assert_allclose(mean, expected, rtol=1e-1)
+
+    cov = final(state[1], state[2]).eval()
+    if do_compute_covariance:
+        expected = np.zeros((n_dim, n_dim))
+    else:
+        expected = np.zeros(n_dim)
+    np.testing.assert_allclose(cov, expected)
+
+
+@pytest.mark.parametrize("n_dim", [1, 3])
+@pytest.mark.parametrize("do_compute_covariance", [True, False])
+def test_welford(n_dim, do_compute_covariance):
+    num_samples = 10
+
+    init, update, final = algorithms.welford_covariance(do_compute_covariance)
+    state = init(n_dim)
+    for i in range(num_samples):
+        sample = i * at.ones(n_dim)
+        state = update(sample, *state)
+
+    mean = state[0].eval()
+    expected = (9.0 / 2) * np.ones(n_dim)
+    np.testing.assert_allclose(mean, expected)
+
+    cov = final(state[1], state[2]).eval()
+    if do_compute_covariance:
+        expected = 55.0 / 6.0 * np.ones((n_dim, n_dim))
+    else:
+        expected = 55.0 / 6.0 * np.ones(n_dim)
+    np.testing.assert_allclose(cov, expected)
+
+
+@pytest.mark.parametrize("do_compute_covariance", [True, False])
+def test_welford_scalar(do_compute_covariance):
+    """"Test the Welford algorithm when the state is a scalar."""
+    num_samples = 10
+
+    init, update, final = algorithms.welford_covariance(do_compute_covariance)
+    state = init(0)
+    for i in range(num_samples):
+        sample = at.as_tensor(i)
+        state = update(sample, *state)
+
+    cov = final(state[1], state[2]).eval()
+    assert pytest.approx(cov.squeeze(), 55.0 / 6.0)
