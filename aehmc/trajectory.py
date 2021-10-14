@@ -271,7 +271,6 @@ def multiplicative_expansion(
     srng: RandomStream,
     trajectory_integrator: Callable,
     uturn_check_fn: Callable,
-    step_size: TensorVariable,
     max_num_expansions: TensorVariable,
 ):
     """Sample a trajectory and update the proposal sequentially
@@ -291,8 +290,6 @@ def multiplicative_expansion(
         and the integrated trajectory.
     uturn_check_fn
         Function used to check the U-Turn criterion.
-    step_size
-        The step size used by the symplectic integrator.
     max_num_expansions
         The maximum number of trajectory expansions until the proposal is
         returned.
@@ -307,6 +304,7 @@ def multiplicative_expansion(
         momentum_sum,
         termination_state,
         initial_energy,
+        step_size,
     ):
         def expand_once(
             step,
