@@ -33,12 +33,13 @@ TerminationStateType = Tuple[
 
 def static_integration(
     integrator: Callable,
-    step_size: float,
     num_integration_steps: int,
 ) -> Callable:
     """Generate a trajectory by integrating several times in one direction."""
 
-    def integrate(q_init, p_init, energy_init, energy_grad_init) -> IntegratorStateType:
+    def integrate(
+        q_init, p_init, energy_init, energy_grad_init, step_size
+    ) -> IntegratorStateType:
         def one_step(q, p, potential_energy, potential_energy_grad):
             new_state = integrator(
                 q, p, potential_energy, potential_energy_grad, step_size
