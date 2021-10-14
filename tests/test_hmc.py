@@ -33,7 +33,7 @@ def build_hmc_trajectory_generator(
     num_integration_steps = aet.scalar("num_integration_steps", dtype="int32")
 
     kernel = kernel_generator(
-        srng, logprob_fn, step_size, inverse_mass_matrix, num_integration_steps
+        srng, logprob_fn, inverse_mass_matrix, num_integration_steps
     )
 
     trajectory, updates = aesara.scan(
@@ -43,6 +43,7 @@ def build_hmc_trajectory_generator(
             {"initial": initial_state[1]},
             {"initial": initial_state[2]},
         ],
+        non_sequences=step_size,
         n_steps=num_states,
     )
     trajectory_generator = aesara.function(

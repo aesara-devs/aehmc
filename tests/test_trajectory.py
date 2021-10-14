@@ -52,13 +52,13 @@ def test_static_integration(example):
 
     potential, kinetic_energy = CircularMotion(inverse_mass_matrix)
     step = velocity_verlet(potential, kinetic_energy)
-    integrator = static_integration(step, step_size, num_steps)
+    integrator = static_integration(step, num_steps)
 
     q = aet.vector("q")
     p = aet.vector("p")
     energy = potential(q)
     energy_grad = aesara.grad(energy, q)
-    final_state = integrator(q, p, energy, energy_grad)
+    final_state = integrator(q, p, energy, energy_grad, step_size)
     integrate_fn = aesara.function((q, p), final_state)
 
     q_final, p_final, *_ = integrate_fn(q_init, p_init)

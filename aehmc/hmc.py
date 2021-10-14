@@ -21,9 +21,8 @@ def new_state(q: TensorVariable, logprob_fn: Callable):
 def kernel(
     srng: RandomStream,
     logprob_fn: TensorVariable,
-    step_size: TensorVariable,
     inverse_mass_matrix: TensorVariable,
-    num_integration_steps: TensorVariable,
+    num_integration_steps: int,
     divergence_threshold: int = 1000,
 ):
     """Build a HMC kernel.
@@ -35,13 +34,9 @@ def kernel(
     logprob_fn
         A function that returns the value of the log-probability density
         function of a chain at a given position.
-    step_size
-        The step size used in the symplectic integrator
     inverse_mass_matrix
         One or two-dimensional array used as the inverse mass matrix that
         defines the euclidean metric.
-    num_integration_steps
-        The number of times we apply the symplectic integrator to integrate the trajectory.
     divergence_threshold
         The difference in energy above which we say the transition is
         divergent.
@@ -64,7 +59,6 @@ def kernel(
     proposal_generator = hmc_proposal(
         symplectic_integrator,
         kinetic_energy_fn,
-        step_size,
         num_integration_steps,
         divergence_threshold,
     )
@@ -73,15 +67,25 @@ def kernel(
         q: TensorVariable,
         potential_energy: TensorVariable,
         potential_energy_grad: TensorVariable,
+        step_size: TensorVariable,
     ):
-        """Perform a single step of the HMC algorithm."""
+        """Perform a single step of the HMC algorithm.
+
+        Parameters
+        ----------
+        step_size
+            The step size used in the symplectic integrator
+
+        """
         p = momentum_generator(srng)
         (
             q_new,
             p_new,
             potential_energy_new,
             potential_energy_grad_new,
-        ) = proposal_generator(srng, q, p, potential_energy, potential_energy_grad)
+        ) = proposal_generator(
+            srng, q, p, potential_energy, potential_energy_grad, step_size
+        )
         return q_new, potential_energy_new, potential_energy_grad_new
 
     return step
@@ -90,15 +94,12 @@ def kernel(
 def hmc_proposal(
     integrator: Callable,
     kinetic_energy: Callable[[TensorVariable], TensorVariable],
-    step_size: TensorVariable,
     num_integration_steps: TensorVariable,
     divergence_threshold: int,
 ):
     """Builds a function that returns a HMC proposal."""
 
-    integrate = trajectory.static_integration(
-        integrator, step_size, num_integration_steps
-    )
+    integrate = trajectory.static_integration(integrator, num_integration_steps)
 
     def propose(
         srng: RandomStream,
@@ -106,11 +107,12 @@ def hmc_proposal(
         p: TensorVariable,
         potential_energy: TensorVariable,
         potential_energy_grad: TensorVariable,
+        step_size: TensorVariable,
     ):
         """Use the HMC algorithm to propose a new state."""
 
         new_q, new_p, new_potential_energy, new_potential_energy_grad = integrate(
-            q, p, potential_energy, potential_energy_grad
+            q, p, potential_energy, potential_energy_grad, step_size
         )
 
         # flip the momentum to keep detailed balance
