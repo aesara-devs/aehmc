@@ -15,7 +15,6 @@ new_state = hmc.new_state
 def kernel(
     srng: RandomStream,
     logprob_fn: Callable[[TensorVariable], TensorVariable],
-    step_size: TensorVariable,
     inverse_mass_matrix: TensorVariable,
     max_num_expansions: int = aet.as_tensor(10),
     divergence_threshold: int = 1000,
@@ -26,7 +25,7 @@ def kernel(
     Parameters
     ----------
     srng
-        RandomStream object.
+        Randomstream object.
     logprob_fn
         A function that returns the value of the log-probability density
         function of a chain at a given position.
@@ -73,7 +72,6 @@ def kernel(
         srng,
         trajectory_integrator,
         uturn_check_fn,
-        step_size,
         max_num_expansions,
     )
 
@@ -81,8 +79,21 @@ def kernel(
         q: TensorVariable,
         potential_energy: TensorVariable,
         potential_energy_grad: TensorVariable,
+        step_size: TensorVariable,
     ):
-        """Move the chain by one step."""
+        """Move the chain by one step.
+
+        Parameters
+        ----------
+        srng
+            Randomstream object.
+        logprob_fn
+            A function that returns the value of the log-probability density
+            function of a chain at a given position.
+        step_size
+            The step size used in the symplectic integrator
+
+        """
         p = momentum_generator(srng)
         initial_state = (q, p, potential_energy, potential_energy_grad)
         initial_termination_state = new_termination_state(q, max_num_expansions)
@@ -100,6 +111,7 @@ def kernel(
             p,
             initial_termination_state,
             initial_energy,
+            step_size,
         )
         for key, value in updates.items():
             key.default_update = value

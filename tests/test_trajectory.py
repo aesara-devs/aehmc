@@ -168,7 +168,7 @@ def test_multiplicative_expansion(case):
     )
 
     expand = multiplicative_expansion(
-        srng, trajectory_integrator, uturn_check_fn, step_size, max_num_expansions
+        srng, trajectory_integrator, uturn_check_fn, max_num_expansions
     )
 
     # Create the initial state
@@ -182,7 +182,7 @@ def test_multiplicative_expansion(case):
     )
     termination_state = new_criterion_state(state[0], 10)
     result, updates = expand(
-        proposal, state, state, state[1], termination_state, energy
+        proposal, state, state, state[1], termination_state, energy, step_size
     )
     fn = aesara.function((), result, updates=updates)
     result = fn()

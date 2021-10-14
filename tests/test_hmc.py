@@ -83,8 +83,8 @@ def test_nuts():
     step_size = aet.scalar("step_size", dtype="float64")
     inverse_mass_matrix = aet.vector("inverse_mass_matrix", dtype="float64")
 
-    kernel = nuts.kernel(srng, normal_logprob, step_size, inverse_mass_matrix)
-    result, updates = kernel(*initial_state)
+    kernel = nuts.kernel(srng, normal_logprob, inverse_mass_matrix)
+    result, updates = kernel(*initial_state, step_size)
 
     trajectory_generator = aesara.function(
         (q, step_size, inverse_mass_matrix),
