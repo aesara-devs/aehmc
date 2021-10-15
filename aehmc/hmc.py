@@ -80,13 +80,14 @@ def kernel(
         p = momentum_generator(srng)
         (
             q_new,
-            p_new,
+            _,
             potential_energy_new,
             potential_energy_grad_new,
+            p_accept,
         ) = proposal_generator(
             srng, q, p, potential_energy, potential_energy_grad, step_size
         )
-        return q_new, potential_energy_new, potential_energy_grad_new
+        return q_new, potential_energy_new, potential_energy_grad_new, p_accept
 
     return step
 
@@ -138,6 +139,12 @@ def hmc_proposal(
             (q, p, potential_energy, potential_energy_grad),
         )
 
-        return final_q, final_p, final_potential_energy, final_potential_energy_grad
+        return (
+            final_q,
+            final_p,
+            final_potential_energy,
+            final_potential_energy_grad,
+            p_accept,
+        )
 
     return propose

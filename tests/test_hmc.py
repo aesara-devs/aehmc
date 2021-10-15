@@ -42,6 +42,7 @@ def build_hmc_trajectory_generator(
             {"initial": initial_state[0]},
             {"initial": initial_state[1]},
             {"initial": initial_state[2]},
+            None,
         ],
         non_sequences=step_size,
         n_steps=num_states,
