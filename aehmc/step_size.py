@@ -5,6 +5,32 @@ import aesara.tensor as at
 from aesara.scan.utils import until
 from aesara.tensor.var import TensorVariable
 
+from aehmc import algorithms
+
+
+def dual_averaging_adaptation(
+    initial_step_size: TensorVariable,
+    target_acceptance_rate: TensorVariable = at.as_tensor(0.65),
+    gamma: float = 0.05,
+    t0: int = 10,
+    kappa: float = 0.75,
+) -> Tuple[Callable, Callable]:
+
+    mu = at.log(10) + at.log(initial_step_size)
+    da_init, da_update = algorithms.dual_averaging(mu, gamma, t0, kappa)
+
+    def update(
+        acceptance_probability: TensorVariable,
+        step: TensorVariable,
+        log_step_size: TensorVariable,
+        log_step_size_avg: TensorVariable,
+        gradient_avg: TensorVariable,
+    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable, TensorVariable]:
+        gradient = target_acceptance_rate - acceptance_probability
+        return da_update(gradient, step, log_step_size, log_step_size_avg, gradient_avg)
+
+    return da_init, update
+
 
 def heuristic_adaptation(
     kernel: Callable,
