@@ -46,11 +46,11 @@ def dual_averaging(
     """
 
     def init(
-        x: TensorVariable,
+        x_init: TensorVariable,
     ) -> Tuple[TensorVariable, TensorVariable, TensorVariable]:
         step = at.as_tensor(1, "step", dtype="int32")
-        gradient_avg = at.as_tensor(0, "gradient_avg", dtype=x.dtype)
-        x_avg = at.as_tensor(0.0, "x_avg", dtype=x.dtype)
+        gradient_avg = at.as_tensor(0, "gradient_avg", dtype=x_init.dtype)
+        x_avg = at.as_tensor(0.0, "x_avg", dtype=x_init.dtype)
         return step, x_avg, gradient_avg
 
     def update(
