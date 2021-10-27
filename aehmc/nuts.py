@@ -18,14 +18,12 @@ def kernel(
     inverse_mass_matrix: TensorVariable,
     max_num_expansions: int = aet.as_tensor(10),
     divergence_threshold: int = 1000,
-):
+) -> Callable:
     """Build an iterative NUTS kernel.
 
 
     Parameters
     ----------
-    srng
-        Randomstream object.
     logprob_fn
         A function that returns the value of the log-probability density
         function of a chain at a given position.
@@ -85,8 +83,6 @@ def kernel(
 
         Parameters
         ----------
-        srng
-            Randomstream object.
         logprob_fn
             A function that returns the value of the log-probability density
             function of a chain at a given position.

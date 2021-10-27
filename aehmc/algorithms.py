@@ -101,7 +101,7 @@ def dual_averaging(
     return init, update
 
 
-def welford_covariance(compute_covariance: bool):
+def welford_covariance(compute_covariance: bool) -> Tuple[Callable, Callable, Callable]:
     """Welford's online estimator of variance/covariance.
 
     It is possible to compute the variance of a population of values in an
@@ -122,7 +122,7 @@ def welford_covariance(compute_covariance: bool):
 
     """
 
-    def init(n_dims: int):
+    def init(n_dims: int) -> Tuple[TensorVariable, TensorVariable, TensorVariable]:
         """Initialize the variance estimation.
 
         Parameters
@@ -148,7 +148,7 @@ def welford_covariance(compute_covariance: bool):
         mean: TensorVariable,
         m2: TensorVariable,
         sample_size: TensorVariable,
-    ):
+    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable]:
         """Update the averages and M2 matrix using the new value.
 
         Parameters
@@ -175,7 +175,7 @@ def welford_covariance(compute_covariance: bool):
 
         return mean, m2, sample_size
 
-    def final(m2, sample_size):
+    def final(m2: TensorVariable, sample_size: TensorVariable) -> TensorVariable:
         """Compute the covariance"""
         variance_or_covariance = m2 / (sample_size - 1)
         return variance_or_covariance
