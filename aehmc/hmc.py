@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Tuple
 
 import aesara
 import aesara.tensor as aet
@@ -12,7 +12,9 @@ import aehmc.metrics as metrics
 import aehmc.trajectory as trajectory
 
 
-def new_state(q: TensorVariable, logprob_fn: Callable):
+def new_state(
+    q: TensorVariable, logprob_fn: Callable
+) -> Tuple[TensorVariable, TensorVariable, TensorVariable]:
     potential_energy = -logprob_fn(q)
     potential_energy_grad = aesara.grad(potential_energy, wrt=q)
     return q, potential_energy, potential_energy_grad
@@ -24,13 +26,11 @@ def kernel(
     inverse_mass_matrix: TensorVariable,
     num_integration_steps: int,
     divergence_threshold: int = 1000,
-):
+) -> Callable:
     """Build a HMC kernel.
 
     Parameters
     ----------
-    srng
-        RandomStream object.
     logprob_fn
         A function that returns the value of the log-probability density
         function of a chain at a given position.
@@ -68,7 +68,7 @@ def kernel(
         potential_energy: TensorVariable,
         potential_energy_grad: TensorVariable,
         step_size: TensorVariable,
-    ):
+    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable, bool]:
         """Perform a single step of the HMC algorithm.
 
         Parameters
@@ -97,7 +97,7 @@ def hmc_proposal(
     kinetic_energy: Callable[[TensorVariable], TensorVariable],
     num_integration_steps: TensorVariable,
     divergence_threshold: int,
-):
+) -> Callable:
     """Builds a function that returns a HMC proposal."""
 
     integrate = trajectory.static_integration(integrator, num_integration_steps)
@@ -109,7 +109,9 @@ def hmc_proposal(
         potential_energy: TensorVariable,
         potential_energy_grad: TensorVariable,
         step_size: TensorVariable,
-    ):
+    ) -> Tuple[
+        TensorVariable, TensorVariable, TensorVariable, TensorVariable, TensorVariable
+    ]:
         """Use the HMC algorithm to propose a new state."""
 
         new_q, new_p, new_potential_energy, new_potential_energy_grad = integrate(

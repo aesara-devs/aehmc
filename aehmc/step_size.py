@@ -96,7 +96,7 @@ def heuristic_adaptation(
     initial_step_size: TensorVariable,
     target_acceptance_rate=0.65,
     max_num_iterations=100,
-):
+) -> TensorVariable:
     """Find a reasonable initial step size during warmup.
 
     While the dual averaging scheme is guaranteed to converge to a reasonable
@@ -134,7 +134,11 @@ def heuristic_adaptation(
             of Machine Learning Research 15.1 (2014): 1593-1623.
     """
 
-    def update(step_size, direction, previous_direction):
+    def update(
+        step_size: TensorVariable,
+        direction: TensorVariable,
+        previous_direction: TensorVariable,
+    ) -> Tuple[Tuple[TensorVariable, TensorVariable, TensorVariable], until]:
         step_size = (2.0 ** direction) * step_size
         *_, p_accept = kernel(*reference_state, step_size)
         new_direction = at.where(

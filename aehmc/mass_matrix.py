@@ -5,6 +5,8 @@ from aesara.tensor.var import TensorVariable
 
 from aehmc import algorithms
 
+WelfordAlgorithmState = Tuple[TensorVariable, TensorVariable, TensorVariable]
+
 
 def covariance_adaptation(
     is_mass_matrix_full: bool = False,
@@ -31,7 +33,9 @@ def covariance_adaptation(
 
     wc_init, wc_update, wc_final = algorithms.welford_covariance(is_mass_matrix_full)
 
-    def init(n_dims: int):
+    def init(
+        n_dims: int,
+    ) -> Tuple[TensorVariable, WelfordAlgorithmState]:
         """Initialize the mass matrix adaptation.
 
         Parameters
@@ -50,7 +54,9 @@ def covariance_adaptation(
 
         return inverse_mass_matrix, wc_state
 
-    def update(position: TensorVariable, wc_state: Tuple):
+    def update(
+        position: TensorVariable, wc_state: WelfordAlgorithmState
+    ) -> WelfordAlgorithmState:
         """Update the algorithm's state.
 
         Parameters
@@ -66,7 +72,7 @@ def covariance_adaptation(
         new_wc_state = wc_update(position, *wc_state)
         return new_wc_state
 
-    def final(wc_state: Tuple):
+    def final(wc_state: WelfordAlgorithmState) -> TensorVariable:
         """Final iteration of the mass matrix adaptation.
 
         In this step we compute the mass matrix from the covariance matrix computed
