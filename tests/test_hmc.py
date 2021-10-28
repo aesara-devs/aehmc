@@ -16,7 +16,7 @@ def normal_logprob(q: TensorVariable):
 
 def test_hmc():
     """Test the HMC kernel on a gaussian target."""
-    step_size = 0.04
+    step_size = 0.5
     inverse_mass_matrix = at.as_tensor(1.0)
     num_integration_steps = 20
 
@@ -46,7 +46,7 @@ def test_hmc():
             None,
         ],
         non_sequences=step_size,
-        n_steps=20_000,
+        n_steps=2_000,
     )
 
     trajectory_generator = aesara.function((y_vv,), trajectory[0], updates=updates)
@@ -56,23 +56,29 @@ def test_hmc():
     assert np.var(samples[1000:]) == pytest.approx(4.0, rel=1e-1)
 
 
-def logprob(q):
-    return -at.sum(0.5 * at.square((q - 3) / 2))
-
-
 def test_nuts():
     """Test the NUTS kernel on a gaussian target."""
-    srng = RandomStream(seed=59)
+    step_size = 0.5
+    inverse_mass_matrix = at.as_tensor(1.0)
 
-    step_size = at.scalar("step_size", dtype="float64")
-    inverse_mass_matrix = at.vector("inverse_mass_matrix", dtype="float64")
-    kernel = nuts.kernel(srng, normal_logprob, inverse_mass_matrix)
+    Y_rv = at.random.normal(1, 2)
 
-    q = at.vector("q")
-    initial_state = nuts.new_state(q, normal_logprob)
+    def logprob_fn(y):
+        logprob = joint_logprob({Y_rv: y})
+        return logprob
+
+    srng = RandomStream(seed=0)
+    kernel = nuts.kernel(
+        srng,
+        logprob_fn,
+        inverse_mass_matrix,
+    )
+
+    y_vv = Y_rv.clone()
+    initial_state = nuts.new_state(y_vv, logprob_fn)
 
     trajectory, updates = aesara.scan(
-        fn=kernel,
+        kernel,
         outputs_info=[
             {"initial": initial_state[0]},
             {"initial": initial_state[1]},
@@ -81,20 +87,11 @@ def test_nuts():
             None,
         ],
         non_sequences=step_size,
-        n_steps=1000,
+        n_steps=1500,
     )
 
-    trajectory_generator = aesara.function(
-        (q, step_size, inverse_mass_matrix),
-        trajectory,
-        updates=updates,
-    )
+    trajectory_generator = aesara.function((y_vv,), trajectory[0], updates=updates)
 
-    step_size = 0.01
-    inverse_mass_matrix = np.array([1.0])
-    initial_position = np.array([1.0])
-    trajectory = trajectory_generator(initial_position, step_size, inverse_mass_matrix)
-    samples = trajectory[0][300:]
-
-    assert np.mean(np.array(samples)) == pytest.approx(3, 1e-1)
-    print(np.var(samples))
+    samples = trajectory_generator(10.0)
+    assert np.mean(samples[100:]) == pytest.approx(1.0, rel=1e-1)
+    assert np.var(samples[100:]) == pytest.approx(4.0, rel=1e-1)
