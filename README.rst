@@ -32,7 +32,6 @@ Example
   kernel = hmc.kernel(
     srng,
     logprob_fn,
-    step_size=1e-3,
     inverse_mass_matrix=at.as_tensor(1.0),
     num_integration_steps=10,
   )
@@ -41,7 +40,7 @@ Example
   y_vv = Y_rv.clone()
   initial_state = hmc.new_state(y_vv, logprob_fn)
 
-  next_step = kernel(*initial_state)
+  next_step = kernel(*initial_state, 1e-3)
   print(next_step[0].eval({y_vv: 0}))
 
 
