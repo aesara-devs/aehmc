@@ -113,13 +113,11 @@ def kernel(
             key.default_update = value
 
         q_new = result[1][-1]
-        p_new = result[2][-1]
         potential_energy_new = result[3][-1]
         potential_energy_grad_new = result[4][-1]
 
         return (
             q_new,
-            p_new,
             potential_energy_new,
             potential_energy_grad_new,
             result[-1][-1],
