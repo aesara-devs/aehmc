@@ -426,7 +426,7 @@ def multiplicative_expansion(
                 new_left_state[1], new_right_state[1], new_momentum_sum
             )
 
-            do_stop_expanding = is_diverging | is_turning
+            do_stop_expanding = is_diverging | is_turning | has_subtree_terminated
             new_proposal = proposal_sampler(srng, proposal, new_proposal)
 
             return (
