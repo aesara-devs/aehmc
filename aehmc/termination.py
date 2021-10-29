@@ -186,7 +186,11 @@ def iterative_uturn(is_turning_fn: Callable):
             return (i - 1, is_turning), until(do_stop)
 
         val, _ = aesara.scan(body_fn, outputs_info=(idx_max, None), n_steps=idx_max + 2)
-        is_turning = val[1][-1]
+
+        # `is_turning_fn` returns a 0-dim array that is somehow broadcast to a 1-dim array
+        # in the scan function, we thus need to take the first element of the resulting
+        # array to return a boolean
+        is_turning = val[1][-1][0]
 
         return is_turning
 
