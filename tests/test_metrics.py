@@ -84,8 +84,10 @@ def test_turning(inverse_mass_matrix_val):
     n_dim = np.shape(inverse_mass_matrix_val)[0]
     is_turning = is_turning_fn(
         inverse_mass_matrix_val, np.ones(n_dim), np.ones(n_dim), np.ones(n_dim)
-    ).item()
-    assert is_turning is True
+    )
+
+    assert is_turning.ndim == 0
+    assert is_turning.item() is True
 
 
 def test_fail_wrong_mass_matrix_dimension():

@@ -104,6 +104,8 @@ def gaussian_metric(
         turning_at_left = aet.dot(velocity_left, rho) <= 0
         turning_at_right = aet.dot(velocity_right, rho) <= 0
 
-        return turning_at_left | turning_at_right
+        is_turning = turning_at_left | turning_at_right
+
+        return is_turning
 
     return momentum_generator, kinetic_energy, is_turning
