@@ -36,6 +36,7 @@ def test_iterative_turning_termination(checkpoint_idxs, expected_turning):
 
     actual_turning = fn(1.0, 3.0)
 
+    assert actual_turning.ndim == 0
     assert expected_turning == actual_turning
 
 
