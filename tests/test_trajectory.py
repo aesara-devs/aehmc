@@ -67,14 +67,17 @@ def test_static_integration(example):
     np.testing.assert_allclose(p_final, example["p_final"], atol=1e-1)
 
 
-@pytest.mark.parametrize("case", [(0.0001, False), (1000, True)])
-def test_dynamic_integration_divergence(case):
+@pytest.mark.parametrize("case", [
+    (0.000001, False, False),
+    (1000, True, False),
+])
+def test_dynamic_integration(case):
     srng = RandomStream(seed=59)
 
     def potential_fn(x):
         return -aet.sum(logprob(aet.random.normal(0.0, 1.0), x))
 
-    should_diverge = case[1]
+    step_size, should_diverge, should_turn = case
 
     # Set up the trajectory integrator
     inverse_mass_matrix = aet.ones(1)
@@ -100,7 +103,7 @@ def test_dynamic_integration_divergence(case):
 
     # Initialize the state
     direction = aet.as_tensor(1)
-    step_size = aet.as_tensor(case[0])
+    step_size = aet.as_tensor(step_size)
     max_num_steps = aet.as_tensor(100)
     num_doublings = aet.as_tensor(10)
     position = aet.as_tensor(np.ones(1))
@@ -120,33 +123,36 @@ def test_dynamic_integration_divergence(case):
         initial_energy,
     )
 
-    state_fn = aesara.function((), state[-2], updates=updates, on_unused_input="ignore")
-    is_diverging = state_fn()
+    is_turning = aesara.function((), state[-1], updates=updates)()
+    is_diverging = aesara.function((), state[-2], updates=updates)()
+    print(aesara.function((), state[-3], updates=updates)())
 
     assert is_diverging.item() is should_diverge
+    assert is_turning.item() is should_turn
 
 
 @pytest.mark.parametrize(
-    "case",
+    "step_size, should_diverge, should_turn, expected_doublings",
     [
-        (0.0000000001, False, False, 10),
-        (1.0, False, True, 1),
+        (0.0000001, False, False, 10),
         (100000.0, True, False, 1),
+        (1.0, False, True, 1),
     ],
 )
-def test_multiplicative_expansion(case):
+def test_multiplicative_expansion(
+    step_size, should_diverge, should_turn, expected_doublings
+):
     srng = RandomStream(seed=59)
 
     def potential_fn(x):
         return 0.5 * aet.sum(aet.square(x))
 
-    step_size, should_diverge, should_turn, expected_doublings = case
     step_size = aet.as_tensor(step_size)
     max_num_expansions = aet.constant(10, dtype="int8")
 
     # Set up the trajectory integrator
-    inverse_mass_matrix = aet.ones(1, dtype="float64")
-    position = aet.zeros(1, dtype="float64")
+    inverse_mass_matrix = aet.as_tensor(1.)
+    position = aet.as_tensor(1.)
 
     momentum_generator, kinetic_energy_fn, uturn_check_fn = gaussian_metric(
         inverse_mass_matrix
@@ -178,9 +184,10 @@ def test_multiplicative_expansion(case):
         state,
         energy,
         aet.as_tensor(0.0, dtype="float64"),
-        aet.as_tensor([-np.inf], dtype="float64"),
+        aet.as_tensor(-np.inf, dtype="float64"),
     )
-    termination_state = new_criterion_state(state[0], 10)
+    termination_state = new_criterion_state(state[0], max_num_expansions)
+    print(termination_state[0].eval())
     result, updates = expand(
         proposal, state, state, state[1], termination_state, energy, step_size
     )
@@ -190,7 +197,10 @@ def test_multiplicative_expansion(case):
     num_doublings = result[0][-1]
     does_diverge = result[-3][-1]
     does_turn = result[-2][-1]
+    has_subtree_terminated = result[-1][-1]
 
-    assert expected_doublings == num_doublings
+    print("Has subtree terminated? ", has_subtree_terminated) 
+
     assert does_diverge == should_diverge
     assert does_turn == should_turn
+    assert expected_doublings == num_doublings

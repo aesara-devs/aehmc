@@ -131,7 +131,7 @@ def iterative_uturn(is_turning_fn: Callable):
             new_nc1 = nc1 + (nc0 & 1)
             return (new_nc0, new_nc1), until(do_stop)
 
-        init = step // 2
+        init = aet.as_tensor(step // 2).astype("int32")
         init_nc1 = aet.constant(0).astype("int32")
         (nc0, nc1), _ = aesara.scan(
             find_idx_max, outputs_info=(init, init_nc1), n_steps=step + 1
@@ -187,10 +187,7 @@ def iterative_uturn(is_turning_fn: Callable):
 
         val, _ = aesara.scan(body_fn, outputs_info=(idx_max, None), n_steps=idx_max + 2)
 
-        # `is_turning_fn` returns a 0-dim array that is somehow broadcast to a 1-dim array
-        # in the scan function, we thus need to take the first element of the resulting
-        # array to return a boolean
-        is_turning = val[1][-1][0]
+        is_turning = val[1][-1]
 
         return is_turning
 
