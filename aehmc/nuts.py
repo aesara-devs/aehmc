@@ -115,13 +115,19 @@ def kernel(
         q_new = result[1][-1]
         potential_energy_new = result[3][-1]
         potential_energy_grad_new = result[4][-1]
+        is_diverging = result[-3][-1]
+        has_subtree_terminated = result[-1][-1]
+        is_turning = result[-2][-1]
+        num_steps = result[0][-1]
 
         return (
             q_new,
             potential_energy_new,
             potential_energy_grad_new,
-            result[-1][-1],
-            result[-2][-1],
+            num_steps,
+            is_turning,
+            is_diverging,
+            has_subtree_terminated,
         ), updates
 
     return step
