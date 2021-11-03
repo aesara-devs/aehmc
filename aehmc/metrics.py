@@ -55,7 +55,7 @@ def gaussian_metric(
     elif inverse_mass_matrix.ndim == 1:
         shape = (shape_tuple(inverse_mass_matrix)[0],)
         mass_matrix_sqrt = aet.sqrt(aet.reciprocal(inverse_mass_matrix))
-        dot, matmul = lambda x, y: x * y, lambda x, y: x * y
+        dot, matmul = aet.dot, lambda x, y: x * y
     elif inverse_mass_matrix.ndim == 2:
         shape = (shape_tuple(inverse_mass_matrix)[0],)
         tril_inv = slinalg.cholesky(inverse_mass_matrix)
@@ -69,7 +69,7 @@ def gaussian_metric(
 
     def momentum_generator(srng: RandomStream) -> TensorVariable:
         norm_samples = srng.normal(0, 1, size=shape, name="momentum")
-        momentum = dot(mass_matrix_sqrt, norm_samples)
+        momentum = matmul(mass_matrix_sqrt, norm_samples)
         return momentum
 
     def kinetic_energy(momentum: TensorVariable) -> TensorVariable:

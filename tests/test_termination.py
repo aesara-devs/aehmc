@@ -1,6 +1,6 @@
 """Test dynamic termination criteria."""
 import aesara
-import aesara.tensor as aet
+import aesara.tensor as at
 import numpy as np
 import pytest
 from numpy.testing import assert_array_equal
@@ -10,31 +10,36 @@ from aehmc.termination import iterative_uturn
 
 
 @pytest.mark.parametrize(
-    "checkpoint_idxs, expected_turning",
-    [((3, 3), True), ((0, 0), False), ((0, 1), True), ((1, 3), True)],
+    "checkpoint_idxs, momentum, momentum_sum, inverse_mass_matrix, expected_turning",
+    [
+        ((3, 3), at.as_tensor(1.0), at.as_tensor(3.0), at.as_tensor(1.), True),
+        ((3, 2), at.as_tensor(1.0), at.as_tensor(3.0), at.as_tensor(1.), False),
+        ((0, 0), at.as_tensor(1.0), at.as_tensor(3.0), at.as_tensor(1.), False),
+        ((0, 1), at.as_tensor(1.0), at.as_tensor(3.0), at.as_tensor(1.), True),
+        ((1, 3), at.as_tensor(1.0), at.as_tensor(3.0), at.as_tensor(1.), True),
+        ((1, 3), at.as_tensor([1.0]), at.as_tensor([3.0]), at.ones(1), True),
+    ],
 )
-def test_iterative_turning_termination(checkpoint_idxs, expected_turning):
-    inverse_mass_matrix = aet.as_tensor(np.ones(1))
+def test_iterative_turning_termination(
+    checkpoint_idxs, momentum, momentum_sum, inverse_mass_matrix, expected_turning
+):
     _, _, is_turning = gaussian_metric(inverse_mass_matrix)
     _, _, is_iterative_turning = iterative_uturn(is_turning)
 
-    momentum = aet.scalar("momentum")
-    momentum_sum = aet.scalar("momentum_sum")
-
     idx_min, idx_max = checkpoint_idxs
-    idx_min = aet.as_tensor(idx_min)
-    idx_max = aet.as_tensor(idx_max)
-    momentum_ckpts = aet.as_tensor(np.array([1.0, 2.0, 3.0, -2.0]))
-    momentum_sum_ckpts = aet.as_tensor(np.array([2.0, 4.0, 4.0, -1.0]))
+    idx_min = at.as_tensor(idx_min)
+    idx_max = at.as_tensor(idx_max)
+    momentum_ckpts = at.as_tensor(np.array([1.0, 2.0, 3.0, -2.0]))
+    momentum_sum_ckpts = at.as_tensor(np.array([2.0, 4.0, 4.0, -1.0]))
     ckpt_state = (momentum_ckpts, momentum_sum_ckpts, idx_min, idx_max)
 
     _, _, is_iterative_turning_fn = iterative_uturn(is_turning)
     is_iterative_turning = is_iterative_turning_fn(ckpt_state, momentum_sum, momentum)
     fn = aesara.function(
-        (momentum, momentum_sum), is_iterative_turning, on_unused_input="ignore"
+        (), is_iterative_turning, on_unused_input="ignore"
     )
 
-    actual_turning = fn(1.0, 3.0)
+    actual_turning = fn()
 
     assert actual_turning.ndim == 0
     assert expected_turning == actual_turning
@@ -45,18 +50,18 @@ def test_iterative_turning_termination(checkpoint_idxs, expected_turning):
     [1, 3],
 )
 def test_termination_update(num_dims):
-    inverse_mass_matrix = aet.as_tensor(np.ones(1))
+    inverse_mass_matrix = at.as_tensor(np.ones(1))
     _, _, is_turning = gaussian_metric(inverse_mass_matrix)
     new_state, update, _ = iterative_uturn(is_turning)
 
-    position = aet.as_tensor(np.ones(num_dims))
-    momentum = aet.as_tensor(np.ones(num_dims))
-    momentum_sum = aet.as_tensor(np.ones(num_dims))
+    position = at.as_tensor(np.ones(num_dims))
+    momentum = at.as_tensor(np.ones(num_dims))
+    momentum_sum = at.as_tensor(np.ones(num_dims))
 
-    num_doublings = aet.as_tensor(4)
+    num_doublings = at.as_tensor(4)
     termination_state = new_state(position, num_doublings)
 
-    step = aet.scalar("step", dtype="int32")
+    step = at.scalar("step", dtype="int32")
     updated = update(termination_state, momentum_sum, momentum, step)
     update_fn = aesara.function((step,), updated, on_unused_input="ignore")
 
