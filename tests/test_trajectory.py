@@ -68,8 +68,8 @@ def test_static_integration(example):
 
 
 @pytest.mark.parametrize("case", [
-    (0.000001, False, False),
-    (1000, True, False),
+    (0.0000001, False, False),
+    (1000, True, True),
 ])
 def test_dynamic_integration(case):
     srng = RandomStream(seed=59)
@@ -104,7 +104,7 @@ def test_dynamic_integration(case):
     # Initialize the state
     direction = aet.as_tensor(1)
     step_size = aet.as_tensor(step_size)
-    max_num_steps = aet.as_tensor(100)
+    max_num_steps = aet.as_tensor(10)
     num_doublings = aet.as_tensor(10)
     position = aet.as_tensor(np.ones(1))
 
@@ -125,7 +125,6 @@ def test_dynamic_integration(case):
 
     is_turning = aesara.function((), state[-1], updates=updates)()
     is_diverging = aesara.function((), state[-2], updates=updates)()
-    print(aesara.function((), state[-3], updates=updates)())
 
     assert is_diverging.item() is should_diverge
     assert is_turning.item() is should_turn
@@ -151,8 +150,8 @@ def test_multiplicative_expansion(
     max_num_expansions = aet.constant(10, dtype="int8")
 
     # Set up the trajectory integrator
-    inverse_mass_matrix = aet.as_tensor(1.)
-    position = aet.as_tensor(1.)
+    inverse_mass_matrix = aet.ones(1)
+    position = aet.ones(1)
 
     momentum_generator, kinetic_energy_fn, uturn_check_fn = gaussian_metric(
         inverse_mass_matrix
@@ -187,7 +186,6 @@ def test_multiplicative_expansion(
         aet.as_tensor(-np.inf, dtype="float64"),
     )
     termination_state = new_criterion_state(state[0], max_num_expansions)
-    print(termination_state[0].eval())
     result, updates = expand(
         proposal, state, state, state[1], termination_state, energy, step_size
     )
