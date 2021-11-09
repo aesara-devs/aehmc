@@ -188,6 +188,7 @@ def iterative_uturn(is_turning_fn: Callable):
         val, _ = aesara.scan(body_fn, outputs_info=(idx_max, None), n_steps=idx_max + 2)
 
         is_turning = val[1][-1]
+        is_turning = aet.where(aet.lt(idx_max, idx_min), aet.constant(0, dtype='bool'), is_turning)
 
         return is_turning
 
