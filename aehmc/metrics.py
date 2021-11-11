@@ -74,7 +74,7 @@ def gaussian_metric(
 
     def kinetic_energy(momentum: TensorVariable) -> TensorVariable:
         velocity = matmul(inverse_mass_matrix, momentum)
-        kinetic_energy = 0.5 * aet.dot(velocity, momentum)
+        kinetic_energy = 0.5 * dot(velocity, momentum)
         return kinetic_energy
 
     def is_turning(
