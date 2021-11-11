@@ -196,7 +196,6 @@ def dynamic_integration(
                 has_terminated,
             ), until(do_stop_integrating)
 
-    
         # We take one step away to start building the subtrajectory
         state = integrator(*previous_last_state, direction * step_size)
         proposal, _ = generate_proposal(initial_energy, state)
@@ -227,17 +226,17 @@ def dynamic_integration(
         )
 
         new_proposal = (
-            (traj[1][-1], traj[2][-1], traj[3][-1], traj[4][-1]),
+            (traj[0][-1], traj[1][-1], traj[2][-1], traj[3][-1]),
+            traj[4][-1],
             traj[5][-1],
             traj[6][-1],
-            traj[7][-1],
         )
-        new_state = (traj[8][-1], traj[9][-1], traj[10][-1], traj[11][-1])
-        subtree_momentum_sum = traj[12][-1]
-        new_termination_state = (traj[13][-1], traj[14][-1], traj[15][-1], traj[16][-1])
+        new_state = (traj[7][-1], traj[8][-1], traj[9][-1], traj[10][-1])
+        subtree_momentum_sum = traj[11][-1]
+        new_termination_state = (traj[12][-1], traj[13][-1], traj[14][-1], traj[15][-1])
+        num_steps = traj[-3][-1]
         is_diverging = traj[-2][-1]
         has_terminated = traj[-1][-1]
-        num_steps = traj[-3][-1]
 
         return (
             new_proposal,
