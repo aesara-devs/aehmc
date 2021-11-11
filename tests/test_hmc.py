@@ -16,9 +16,9 @@ def normal_logprob(q: TensorVariable):
 
 def test_hmc():
     """Test the HMC kernel on a gaussian target."""
-    step_size = 0.5
+    step_size = 1.
     inverse_mass_matrix = at.as_tensor(1.0)
-    num_integration_steps = 20
+    num_integration_steps = 10
 
     Y_rv = at.random.normal(1, 2)
 
@@ -58,7 +58,7 @@ def test_hmc():
 
 def test_nuts():
     """Test the NUTS kernel on a gaussian target."""
-    step_size = 0.5
+    step_size = 1.
     inverse_mass_matrix = at.as_tensor(1.0)
 
     Y_rv = at.random.normal(1, 2)
@@ -85,13 +85,15 @@ def test_nuts():
             {"initial": initial_state[2]},
             None,
             None,
+            None,
+            None,
         ],
         non_sequences=step_size,
-        n_steps=1500,
+        n_steps=2000,
     )
 
     trajectory_generator = aesara.function((y_vv,), trajectory[0], updates=updates)
 
-    samples = trajectory_generator(10.0)
-    assert np.mean(samples[100:]) == pytest.approx(1.0, rel=1e-1)
-    assert np.var(samples[100:]) == pytest.approx(4.0, rel=1e-1)
+    samples = trajectory_generator(3.0)
+    assert np.mean(samples[1000:]) == pytest.approx(1.0, rel=1e-1)
+    assert np.var(samples[1000:]) == pytest.approx(4.0, rel=1e-1)
