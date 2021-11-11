@@ -12,36 +12,35 @@ Example
 
 .. code-block:: python
 
-  import aesara
-  from aesara import tensor as at
-  from aesara.tensor.random.utils import RandomStream
+        import aesara
+        from aesara import tensor as at
+        from aesara.tensor.random.utils import RandomStream
 
-  from aeppl import joint_logprob
+        from aeppl import joint_logprob
 
-  from aehmc import hmc
+        from aehmc import nuts
 
-  # A simple normal distribution
-  Y_rv = at.random.normal(0, 1)
+        # A simple normal distribution
+        Y_rv = at.random.normal(0, 1)
 
-  def logprob_fn(y):
-      logprob = joint_logprob({Y_rv: y})
-      return logprob
+        def logprob_fn(y):
+          logprob = joint_logprob({Y_rv: y})
+          return logprob
 
-  # Build the transition kernel
-  srng = RandomStream(seed=0)
-  kernel = hmc.kernel(
-    srng,
-    logprob_fn,
-    inverse_mass_matrix=at.as_tensor(1.0),
-    num_integration_steps=10,
-  )
-  
-  # Compile a function that updates the chain
-  y_vv = Y_rv.clone()
-  initial_state = hmc.new_state(y_vv, logprob_fn)
+        # Build the transition kernel
+        srng = RandomStream(seed=0)
+        kernel = nuts.kernel(
+            srng,
+            logprob_fn,
+            inverse_mass_matrix=at.as_tensor(1.),
+        )
 
-  next_step = kernel(*initial_state, 1e-3)
-  print(next_step[0].eval({y_vv: 0}))
+        # Compile a function that updates the chain
+        y_vv = Y_rv.clone()
+        initial_state = nuts.new_state(y_vv, logprob_fn)
+
+        next_step = kernel(*initial_state, 1e-2)
+        print(next_step[0][1].eval({y_vv: 0}))
 
 
 Installation
