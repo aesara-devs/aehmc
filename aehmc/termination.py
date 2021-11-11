@@ -47,13 +47,21 @@ def iterative_uturn(is_turning_fn: Callable):
             sums to store.
 
         """
-        num_dims = aet.atleast_1d(position).shape[0]
-        return (
-            aet.zeros((max_num_doublings, num_dims)),
-            aet.zeros((max_num_doublings, num_dims)),
-            aet.constant(0, dtype="int32"),
-            aet.constant(0, dtype="int32"),
-        )
+        if position.ndim == 0:
+            return (
+                aet.zeros(max_num_doublings),
+                aet.zeros(max_num_doublings),
+                aet.constant(0, dtype="int32"),
+                aet.constant(0, dtype="int32"),
+            )
+        else:
+            num_dims = position.shape[0]
+            return (
+                aet.zeros((max_num_doublings, num_dims)),
+                aet.zeros((max_num_doublings, num_dims)),
+                aet.constant(0, dtype="int32"),
+                aet.constant(0, dtype="int32"),
+            )
 
     def update(
         state: Tuple,
@@ -188,7 +196,9 @@ def iterative_uturn(is_turning_fn: Callable):
         val, _ = aesara.scan(body_fn, outputs_info=(idx_max, None), n_steps=idx_max + 2)
 
         is_turning = val[1][-1]
-        is_turning = aet.where(aet.lt(idx_max, idx_min), aet.constant(0, dtype='bool'), is_turning)
+        is_turning = aet.where(
+            aet.lt(idx_max, idx_min), aet.as_tensor(0, dtype="bool"), is_turning
+        )
 
         return is_turning
 

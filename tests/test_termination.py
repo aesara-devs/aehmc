@@ -12,11 +12,11 @@ from aehmc.termination import iterative_uturn
 @pytest.mark.parametrize(
     "checkpoint_idxs, momentum, momentum_sum, inverse_mass_matrix, expected_turning",
     [
-        ((3, 3), at.as_tensor(1.0), at.as_tensor(3.0), at.as_tensor(1.), True),
-        ((3, 2), at.as_tensor(1.0), at.as_tensor(3.0), at.as_tensor(1.), False),
-        ((0, 0), at.as_tensor(1.0), at.as_tensor(3.0), at.as_tensor(1.), False),
-        ((0, 1), at.as_tensor(1.0), at.as_tensor(3.0), at.as_tensor(1.), True),
-        ((1, 3), at.as_tensor(1.0), at.as_tensor(3.0), at.as_tensor(1.), True),
+        ((3, 3), at.as_tensor(1.0), at.as_tensor(3.0), at.as_tensor(1.0), True),
+        ((3, 2), at.as_tensor(1.0), at.as_tensor(3.0), at.as_tensor(1.0), False),
+        ((0, 0), at.as_tensor(1.0), at.as_tensor(3.0), at.as_tensor(1.0), False),
+        ((0, 1), at.as_tensor(1.0), at.as_tensor(3.0), at.as_tensor(1.0), True),
+        ((1, 3), at.as_tensor(1.0), at.as_tensor(3.0), at.as_tensor(1.0), True),
         ((1, 3), at.as_tensor([1.0]), at.as_tensor([3.0]), at.ones(1), True),
     ],
 )
@@ -35,9 +35,7 @@ def test_iterative_turning_termination(
 
     _, _, is_iterative_turning_fn = iterative_uturn(is_turning)
     is_iterative_turning = is_iterative_turning_fn(ckpt_state, momentum_sum, momentum)
-    fn = aesara.function(
-        (), is_iterative_turning, on_unused_input="ignore"
-    )
+    fn = aesara.function((), is_iterative_turning, on_unused_input="ignore")
 
     actual_turning = fn()
 
