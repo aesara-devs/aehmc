@@ -133,8 +133,8 @@ def test_dynamic_integration(case):
 @pytest.mark.parametrize(
     "step_size, should_diverge, should_turn, expected_doublings",
     [
+        (100000.0, True, True, 1),
         (0.0000001, False, False, 10),
-        (100000.0, True, False, 1),
         (1.0, False, True, 1),
     ],
 )
@@ -147,11 +147,8 @@ def test_multiplicative_expansion(
         return 0.5 * aet.sum(aet.square(x))
 
     step_size = aet.as_tensor(step_size)
-    max_num_expansions = aet.constant(10, dtype="int8")
-
-    # Set up the trajectory integrator
-    inverse_mass_matrix = aet.ones(1)
-    position = aet.ones(1)
+    inverse_mass_matrix = aet.as_tensor(1., dtype='float64')
+    position = aet.as_tensor(1., dtype='float64')
 
     momentum_generator, kinetic_energy_fn, uturn_check_fn = gaussian_metric(
         inverse_mass_matrix
@@ -173,7 +170,7 @@ def test_multiplicative_expansion(
     )
 
     expand = multiplicative_expansion(
-        srng, trajectory_integrator, uturn_check_fn, max_num_expansions
+        srng, trajectory_integrator, uturn_check_fn, 10
     )
 
     # Create the initial state
@@ -185,7 +182,7 @@ def test_multiplicative_expansion(
         aet.as_tensor(0.0, dtype="float64"),
         aet.as_tensor(-np.inf, dtype="float64"),
     )
-    termination_state = new_criterion_state(state[0], max_num_expansions)
+    termination_state = new_criterion_state(state[0], 10)
     result, updates = expand(
         proposal, state, state, state[1], termination_state, energy, step_size
     )
@@ -195,9 +192,6 @@ def test_multiplicative_expansion(
     num_doublings = result[0][-1]
     does_diverge = result[-3][-1]
     does_turn = result[-2][-1]
-    has_subtree_terminated = result[-1][-1]
-
-    print("Has subtree terminated? ", has_subtree_terminated) 
 
     assert does_diverge == should_diverge
     assert does_turn == should_turn
