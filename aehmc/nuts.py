@@ -16,7 +16,7 @@ def kernel(
     srng: RandomStream,
     logprob_fn: Callable[[TensorVariable], TensorVariable],
     inverse_mass_matrix: TensorVariable,
-    max_num_expansions: int = aet.as_tensor(10),
+    max_num_expansions: int = 10,
     divergence_threshold: int = 1000,
 ) -> Callable:
     """Build an iterative NUTS kernel.
@@ -98,7 +98,7 @@ def kernel(
             initial_state,
             initial_energy,
             aet.as_tensor(0.0, dtype="float64"),
-            aet.as_tensor([-np.inf], dtype="float64"),
+            aet.as_tensor(-np.inf, dtype="float64"),
         )
         result, updates = expand(
             initial_proposal,
