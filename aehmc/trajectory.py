@@ -2,7 +2,6 @@ from typing import Callable, Tuple
 
 import aesara
 import aesara.tensor as aet
-import numpy as np
 from aesara.ifelse import ifelse
 from aesara.scan.utils import until
 from aesara.tensor.random.utils import RandomStream
@@ -207,7 +206,7 @@ def dynamic_integration(
             0,
         )
 
-        steps = aet.arange(1, 1 + max_num_steps) 
+        steps = aet.arange(1, 1 + max_num_steps)
         traj, updates = aesara.scan(
             add_one_state,
             outputs_info=(
@@ -307,14 +306,11 @@ def multiplicative_expansion(
             p_right,
             potential_energy_right,
             potential_energy_grad_right,
-            momentum_sum,
+            momentum_sum,  # sum of momenta along trajectory
             momentum_ckpts,  # termination_state
             momentum_sum_ckpts,
             idx_min,
             idx_max,
-            is_diverging,
-            has_terminated,
-            do_stop_expanding,
         ):
             """Expand the current trajectory.
 
@@ -380,18 +376,18 @@ def multiplicative_expansion(
             for key, value in inner_updates.items():
                 key.default_update = value
 
-            new_momentum_sum = momentum_sum + subtree_momentum_sum
-
+            # Update the trajectory.
             # The trajectory integrator always integrates forward in time; we
             # thus need to switch the states if the other direction was picked.
             new_left_state = where_state(do_go_right, left_state, new_state)
             new_right_state = where_state(do_go_right, new_state, right_state)
+            new_momentum_sum = momentum_sum + subtree_momentum_sum
 
-            # Update the proposal If the termination criterion is reached in
-            # the subtree or if a divergence occurs we reject this subtree's
-            # proposal. We nevertheless update the sum of the logarithm of the
-            # acceptance probabilities to serve as an estimate for dual
-            # averaging.
+            # Update the proposal.
+            # If the termination criterion is reached in the subtree or if a
+            # divergence occurs we reject this subtree's proposal. We
+            # nevertheless update the sum of the logarithm of the acceptance
+            # probabilities to serve as an estimate for dual averaging.
             updated_sum_log_p_accept = _logaddexp(proposal[3], new_proposal[3])
             updated_proposal = (
                 proposal[0],
@@ -406,16 +402,14 @@ def multiplicative_expansion(
                 proposal_sampler(srng, proposal, new_proposal),
             )
 
-            # check if the trajectory is turning
+            # Check if the trajectory is turning and determine whether we need
+            # to stop expanding the trajectory.
             is_turning = uturn_check_fn(
                 new_left_state[1], new_right_state[1], new_momentum_sum
             )
-
             do_stop_expanding = is_diverging | is_turning | has_subtree_terminated
-            new_proposal = proposal_sampler(srng, proposal, new_proposal)
 
             return (
-                step + 1,
                 *sampled_proposal[0],
                 sampled_proposal[1],
                 sampled_proposal[2],
@@ -424,16 +418,15 @@ def multiplicative_expansion(
                 *new_right_state,
                 new_momentum_sum,
                 *new_termination_state,
+                step + 1,
                 is_diverging,
                 is_turning,
-                has_subtree_terminated,
             ), until(do_stop_expanding)
 
-        expansion_step = aet.as_tensor(0, dtype=np.int32)
+        expansion_steps = aet.arange(0, max_num_expansions)
         results, updates = aesara.scan(
             expand_once,
             outputs_info=(
-                expansion_step,
                 *proposal[0],
                 proposal[1],
                 proposal[2],
@@ -442,11 +435,11 @@ def multiplicative_expansion(
                 *right_state,
                 momentum_sum,
                 *termination_state,
-                np.array(False),
-                np.array(False),
-                np.array(False),
+                None,
+                None,
+                None,
             ),
-            n_steps=max_num_expansions,
+            sequences=expansion_steps,
         )
         for key, value in updates.items():
             key.default_update = value
