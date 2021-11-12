@@ -397,7 +397,7 @@ def multiplicative_expansion(
             )
 
             sampled_proposal = where_proposal(
-                is_diverging,
+                is_diverging | has_subtree_terminated,
                 updated_proposal,
                 proposal_sampler(srng, proposal, new_proposal),
             )
