@@ -58,20 +58,20 @@ def velocity_verlet(
         step_size: TensorVariable,
     ) -> IntegratorStateType:
 
-        new_momentum = momentum - b1 * step_size * potential_energy_grad
+        momentum = momentum - b1 * step_size * potential_energy_grad
 
-        kinetic_grad = aesara.grad(kinetic_energy_fn(new_momentum), new_momentum)
-        new_position = position + a2 * step_size * kinetic_grad
+        kinetic_grad = aesara.grad(kinetic_energy_fn(momentum), momentum)
+        position = position + a2 * step_size * kinetic_grad
 
-        new_potential_energy = potential_fn(new_position)
-        new_potential_energy_grad = aesara.grad(new_potential_energy, new_position)
-        new_momentum = new_momentum - b1 * step_size * new_potential_energy_grad
+        potential_energy = potential_fn(position)
+        potential_energy_grad = aesara.grad(potential_energy, position)
+        momentum = momentum - b1 * step_size * potential_energy_grad
 
         return (
-            new_position,
-            new_momentum,
-            new_potential_energy,
-            new_potential_energy_grad,
+            position,
+            momentum,
+            potential_energy,
+            potential_energy_grad,
         )
 
     return one_step
