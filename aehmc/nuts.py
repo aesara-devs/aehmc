@@ -49,19 +49,17 @@ def kernel(
     def potential_fn(x):
         return -logprob_fn(x)
 
-    momentum_generator, kinetic_ernergy_fn, uturn_check_fn = metrics.gaussian_metric(
+    momentum_generator, kinetic_energy_fn, uturn_check_fn = metrics.gaussian_metric(
         inverse_mass_matrix
     )
-    symplectic_integrator = integrators.velocity_verlet(
-        potential_fn, kinetic_ernergy_fn
-    )
+    symplectic_integrator = integrators.velocity_verlet(potential_fn, kinetic_energy_fn)
     new_termination_state, update_termination_state, is_criterion_met = iterative_uturn(
         uturn_check_fn
     )
     trajectory_integrator = dynamic_integration(
         srng,
         symplectic_integrator,
-        kinetic_ernergy_fn,
+        kinetic_energy_fn,
         update_termination_state,
         is_criterion_met,
         divergence_threshold,
@@ -93,7 +91,7 @@ def kernel(
         p = momentum_generator(srng)
         initial_state = (q, p, potential_energy, potential_energy_grad)
         initial_termination_state = new_termination_state(q, max_num_expansions)
-        initial_energy = potential_energy + kinetic_ernergy_fn(p)
+        initial_energy = potential_energy + kinetic_energy_fn(p)
         initial_proposal = (
             initial_state,
             initial_energy,
@@ -112,13 +110,15 @@ def kernel(
         for key, value in updates.items():
             key.default_update = value
 
-        q_new = result[1][-1]
-        potential_energy_new = result[3][-1]
-        potential_energy_grad_new = result[4][-1]
-        is_diverging = result[-3][-1]
-        has_subtree_terminated = result[-1][-1]
-        is_turning = result[-2][-1]
-        num_steps = result[0][-1]
+        # New MCMC proposal
+        q_new = result[0][-1]
+        potential_energy_new = result[2][-1]
+        potential_energy_grad_new = result[3][-1]
+
+        # Diagnostics
+        is_turning = result[-1][-1]
+        is_diverging = result[-2][-1]
+        num_steps = result[-3][-1]
 
         return (
             q_new,
@@ -127,7 +127,6 @@ def kernel(
             num_steps,
             is_turning,
             is_diverging,
-            has_subtree_terminated,
         ), updates
 
     return step

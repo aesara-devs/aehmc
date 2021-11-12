@@ -67,10 +67,13 @@ def test_static_integration(example):
     np.testing.assert_allclose(p_final, example["p_final"], atol=1e-1)
 
 
-@pytest.mark.parametrize("case", [
-    (0.0000001, False, False),
-    (1000, True, True),
-])
+@pytest.mark.parametrize(
+    "case",
+    [
+        (0.0000001, False, False),
+        (1000, True, True),
+    ],
+)
 def test_dynamic_integration(case):
     srng = RandomStream(seed=59)
 
@@ -147,8 +150,8 @@ def test_multiplicative_expansion(
         return 0.5 * aet.sum(aet.square(x))
 
     step_size = aet.as_tensor(step_size)
-    inverse_mass_matrix = aet.as_tensor(1., dtype='float64')
-    position = aet.as_tensor(1., dtype='float64')
+    inverse_mass_matrix = aet.as_tensor(1.0, dtype="float64")
+    position = aet.as_tensor(1.0, dtype="float64")
 
     momentum_generator, kinetic_energy_fn, uturn_check_fn = gaussian_metric(
         inverse_mass_matrix
@@ -169,9 +172,7 @@ def test_multiplicative_expansion(
         divergence_threshold=aet.as_tensor(1000),
     )
 
-    expand = multiplicative_expansion(
-        srng, trajectory_integrator, uturn_check_fn, 10
-    )
+    expand = multiplicative_expansion(srng, trajectory_integrator, uturn_check_fn, 10)
 
     # Create the initial state
     state = new_integrator_state(potential_fn, position, momentum_generator(srng))
@@ -189,9 +190,9 @@ def test_multiplicative_expansion(
     fn = aesara.function((), result, updates=updates)
     result = fn()
 
-    num_doublings = result[0][-1]
-    does_diverge = result[-3][-1]
-    does_turn = result[-2][-1]
+    num_doublings = result[-3][-1]
+    does_diverge = result[-2][-1]
+    does_turn = result[-1][-1]
 
     assert does_diverge == should_diverge
     assert does_turn == should_turn

@@ -16,7 +16,7 @@ def normal_logprob(q: TensorVariable):
 
 def test_hmc():
     """Test the HMC kernel on a gaussian target."""
-    step_size = 1.
+    step_size = 1.0
     inverse_mass_matrix = at.as_tensor(1.0)
     num_integration_steps = 10
 
@@ -58,7 +58,7 @@ def test_hmc():
 
 def test_nuts():
     """Test the NUTS kernel on a gaussian target."""
-    step_size = 1.
+    step_size = 1.0
     inverse_mass_matrix = at.as_tensor(1.0)
 
     Y_rv = at.random.normal(1, 2)
@@ -83,7 +83,6 @@ def test_nuts():
             {"initial": initial_state[0]},
             {"initial": initial_state[1]},
             {"initial": initial_state[2]},
-            None,
             None,
             None,
             None,
