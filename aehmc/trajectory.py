@@ -388,7 +388,7 @@ def multiplicative_expansion(
             # divergence occurs we reject this subtree's proposal. We
             # nevertheless update the sum of the logarithm of the acceptance
             # probabilities to serve as an estimate for dual averaging.
-            updated_sum_log_p_accept = _logaddexp(proposal[3], new_proposal[3])
+            updated_sum_log_p_accept = aet.logaddexp(proposal[3], new_proposal[3])
             updated_proposal = (
                 proposal[0],
                 proposal[1],
@@ -487,10 +487,3 @@ def where_proposal(
     )
 
     return (state, energy, weight, log_sum_p_accept)
-
-
-def _logaddexp(a, b):
-    diff = b - a
-    return aet.switch(
-        diff > 0, b + aet.log1p(aet.exp(-diff)), a + aet.log1p(aet.exp(-diff))
-    )

@@ -130,8 +130,8 @@ def maybe_update_proposal(
     state, energy, weight, sum_log_p_accept = proposal
     new_state, new_energy, new_weight, new_sum_log_p_accept = new_proposal
 
-    updated_weight = _logaddexp(weight, new_weight)
-    updated_sum_log_p_accept = _logaddexp(sum_log_p_accept, new_sum_log_p_accept)
+    updated_weight = aet.logaddexp(weight, new_weight)
+    updated_sum_log_p_accept = aet.logaddexp(sum_log_p_accept, new_sum_log_p_accept)
 
     updated_q = aet.where(do_accept, new_state[0], state[0])
     updated_p = aet.where(do_accept, new_state[1], state[1])
@@ -144,11 +144,4 @@ def maybe_update_proposal(
         updated_energy,
         updated_weight,
         updated_sum_log_p_accept,
-    )
-
-
-def _logaddexp(a, b):
-    diff = b - a
-    return aet.switch(
-        diff > 0, b + aet.log1p(aet.exp(-diff)), a + aet.log1p(aet.exp(-diff))
     )
