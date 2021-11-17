@@ -119,11 +119,13 @@ def kernel(
         is_turning = result[-1][-1]
         is_diverging = result[-2][-1]
         num_steps = result[-3][-1]
+        acceptance_probability = result[-4][-1]
 
         return (
             q_new,
             potential_energy_new,
             potential_energy_grad_new,
+            acceptance_probability,
             num_steps,
             is_turning,
             is_diverging,
