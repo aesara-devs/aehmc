@@ -86,6 +86,7 @@ def test_nuts():
             None,
             None,
             None,
+            None,
         ],
         non_sequences=step_size,
         n_steps=2000,
