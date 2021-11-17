@@ -138,7 +138,7 @@ def dynamic_integration(
             potential_energy_grad_proposal,
             energy_proposal,
             weight,
-            sum_log_p_accept,
+            sum_p_accept,
             q_last,  # state
             p_last,
             potential_energy_last,
@@ -165,7 +165,7 @@ def dynamic_integration(
                 ),
                 energy_proposal,
                 weight,
-                sum_log_p_accept,
+                sum_p_accept,
             )
 
             new_state = integrator(*state, direction * step_size)
@@ -197,7 +197,7 @@ def dynamic_integration(
 
         # We take one step away to start building the subtrajectory
         state = integrator(*previous_last_state, direction * step_size)
-        proposal, _ = generate_proposal(initial_energy, state)
+        proposal, is_diverging = generate_proposal(initial_energy, state)
         momentum_sum = state[1]
         termination_state = update_termination_state(
             termination_state,
@@ -233,8 +233,8 @@ def dynamic_integration(
         new_state = (traj[7][-1], traj[8][-1], traj[9][-1], traj[10][-1])
         subtree_momentum_sum = traj[11][-1]
         new_termination_state = (traj[12][-1], traj[13][-1], traj[14][-1], traj[15][-1])
-        num_steps = traj[-3][-1]
-        is_diverging = traj[-2][-1]
+        num_steps = 1 + traj[-3][-1]
+        is_diverging = traj[-2][-1] | is_diverging
         has_terminated = traj[-1][-1]
 
         return (
@@ -297,7 +297,7 @@ def multiplicative_expansion(
             potential_energy_grad_proposal,
             energy_proposal,
             weight,
-            sum_log_p_accept,
+            sum_p_accept,
             q_left,  # trajectory
             p_left,
             potential_energy_left,
@@ -344,7 +344,7 @@ def multiplicative_expansion(
                 ),
                 energy_proposal,
                 weight,
-                sum_log_p_accept,
+                sum_p_accept,
             )
             termination_state = (
                 momentum_ckpts,
@@ -362,7 +362,7 @@ def multiplicative_expansion(
                 new_state,
                 subtree_momentum_sum,
                 new_termination_state,
-                _,
+                subtrajectory_length,
                 is_diverging,
                 has_subtree_terminated,
             ), inner_updates = trajectory_integrator(
@@ -383,17 +383,22 @@ def multiplicative_expansion(
             new_right_state = where_state(do_go_right, new_state, right_state)
             new_momentum_sum = momentum_sum + subtree_momentum_sum
 
+            # Compute the pseudo-acceptance probability for the NUTS algorithm.
+            # It can be understood as the average acceptance probability MC would give to
+            # the states explored during the final expansion.
+            acceptance_probability = new_proposal[3] / subtrajectory_length
+
             # Update the proposal.
             # If the termination criterion is reached in the subtree or if a
             # divergence occurs we reject this subtree's proposal. We
             # nevertheless update the sum of the logarithm of the acceptance
             # probabilities to serve as an estimate for dual averaging.
-            updated_sum_log_p_accept = aet.logaddexp(proposal[3], new_proposal[3])
+            updated_weight = aet.logaddexp(proposal[2], new_proposal[2])
             updated_proposal = (
                 proposal[0],
                 proposal[1],
-                proposal[2],
-                updated_sum_log_p_accept,
+                updated_weight,
+                new_proposal[3] + proposal[3],
             )
 
             sampled_proposal = where_proposal(
@@ -418,6 +423,7 @@ def multiplicative_expansion(
                 *new_right_state,
                 new_momentum_sum,
                 *new_termination_state,
+                acceptance_probability,
                 step + 1,
                 is_diverging,
                 is_turning,
@@ -435,6 +441,7 @@ def multiplicative_expansion(
                 *right_state,
                 momentum_sum,
                 *termination_state,
+                None,
                 None,
                 None,
                 None,

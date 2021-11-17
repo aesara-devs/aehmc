@@ -43,9 +43,9 @@ def proposal_generator(kinetic_energy: Callable, divergence_threshold: float):
         is_transition_divergent = aet.abs_(delta_energy) > divergence_threshold
 
         weight = delta_energy
-        sum_log_p_accept = aet.minimum(delta_energy, 0.0)
+        p_accept = aet.clip(aet.exp(delta_energy), 0.0, 1.0)
 
-        return (state, new_energy, weight, sum_log_p_accept), is_transition_divergent
+        return (state, new_energy, weight, p_accept), is_transition_divergent
 
     return update
 
@@ -78,8 +78,8 @@ def progressive_uniform_sampling(
     Either the current or the new proposal.
 
     """
-    state, energy, weight, sum_log_p_accept = proposal
-    new_state, new_energy, new_weight, new_sum_log_p_accept = new_proposal
+    state, energy, weight, _ = proposal
+    new_state, new_energy, new_weight, _ = new_proposal
 
     p_accept = aet.expit(new_weight - weight)
     do_accept = srng.bernoulli(p_accept)
@@ -113,8 +113,8 @@ def progressive_biased_sampling(
     Either the current or the new proposal.
 
     """
-    state, energy, weight, sum_log_p_accept = proposal
-    new_state, new_energy, new_weight, new_sum_log_p_accept = new_proposal
+    state, energy, weight, _ = proposal
+    new_state, new_energy, new_weight, _ = new_proposal
 
     p_accept = aet.clip(aet.exp(new_weight - weight), 0.0, 1.0)
     do_accept = srng.bernoulli(p_accept)
@@ -127,11 +127,11 @@ def maybe_update_proposal(
     do_accept: bool, proposal: ProposalStateType, new_proposal: ProposalStateType
 ) -> ProposalStateType:
     """Return either proposal depending on the boolean `do_accept`"""
-    state, energy, weight, sum_log_p_accept = proposal
-    new_state, new_energy, new_weight, new_sum_log_p_accept = new_proposal
+    state, energy, weight, sum_p_accept = proposal
+    new_state, new_energy, new_weight, new_sum_p_accept = new_proposal
 
     updated_weight = aet.logaddexp(weight, new_weight)
-    updated_sum_log_p_accept = aet.logaddexp(sum_log_p_accept, new_sum_log_p_accept)
+    updated_sum_p_accept = sum_p_accept + new_sum_p_accept
 
     updated_q = aet.where(do_accept, new_state[0], state[0])
     updated_p = aet.where(do_accept, new_state[1], state[1])
@@ -143,5 +143,5 @@ def maybe_update_proposal(
         (updated_q, updated_p, updated_potential_energy, updated_potential_energy_grad),
         updated_energy,
         updated_weight,
-        updated_sum_log_p_accept,
+        updated_sum_p_accept,
     )
