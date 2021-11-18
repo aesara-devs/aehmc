@@ -1,4 +1,5 @@
 aeppl
+arviz
 versioneer
 -e ./
 coveralls
