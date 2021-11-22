@@ -101,6 +101,16 @@ def test_nuts():
     assert np.var(samples[1000:]) == pytest.approx(4.0, rel=1e-1)
 
 
+def assert_mcse(samples, true_param, p_val=0.01):
+    d = arviz.convert_to_dataset(np.expand_dims(samples, axis=0))
+    ess = np.array(arviz.ess(d).to_array())
+    posterior_mean = np.mean(samples, axis=0)
+    posterior_sd = np.std(samples, axis=0, ddof=1)
+    avg_monte_carlo_standard_error = np.mean(posterior_sd, axis=0) / np.sqrt(ess)
+    scaled_error = np.abs(posterior_mean - true_param) / avg_monte_carlo_standard_error
+    np.testing.assert_array_less(scaled_error, stats.norm.ppf(1 - p_val))
+
+
 def test_nuts_mcse(p_val=0.01):
 
     loc = np.array([0.0, 3.0])
@@ -118,21 +128,6 @@ def test_nuts_mcse(p_val=0.01):
 
     def logprob_fn(y):
         return joint_logprob({Y_rv: y})
-
-    def assert_mcse(samples, true_param, p_val=0.01):
-        ess = np.array(
-            [
-                arviz.ess(np.expand_dims(posterior_delta[:, 0], axis=0)),
-                arviz.ess(np.expand_dims(posterior_delta[:, 1], axis=0)),
-            ]
-        )
-        posterior_mean = np.mean(samples, axis=0)
-        posterior_sd = np.std(samples, axis=0, ddof=1)
-        avg_monte_carlo_standard_error = np.mean(posterior_sd, axis=0) / np.sqrt(ess)
-        scaled_error = (
-            np.abs(posterior_mean - true_param) / avg_monte_carlo_standard_error
-        )
-        np.testing.assert_array_less(scaled_error, stats.norm.ppf(1 - p_val))
 
     srng = RandomStream(seed=0)
     kernel = nuts.kernel(
@@ -157,6 +152,58 @@ def test_nuts_mcse(p_val=0.01):
         ],
         non_sequences=1.0,
         n_steps=2000,
+    )
+
+    trajectory_generator = aesara.function((y_vv,), trajectory[0], updates=updates)
+
+    rng = np.random.default_rng()
+    posterior_samples = trajectory_generator(rng.standard_normal(2))[-1000:]
+
+    posterior_delta = posterior_samples - loc
+    posterior_variance = posterior_delta ** 2
+    posterior_correlation = np.prod(posterior_delta, axis=-1, keepdims=True) / (
+        scale[0] * scale[1]
+    )
+
+    assert_mcse(posterior_samples, loc)
+    assert_mcse(posterior_variance, scale ** 2)
+    assert_mcse(posterior_correlation, rho)
+
+
+def test_hmc_mcse(p_val=0.01):
+
+    loc = np.array([0.0, 3.0])
+    scale = np.array([1.0, 2.0])
+    rho = np.array(0.75)
+
+    cov = np.diag(scale ** 2)
+    cov[0, 1] = rho * scale[0] * scale[1]
+    cov[1, 0] = rho * scale[0] * scale[1]
+
+    loc_tt = at.as_tensor(loc)
+    scale_tt = at.as_tensor(scale)
+    cov_tt = at.as_tensor(cov)
+    Y_rv = at.random.multivariate_normal(loc_tt, cov_tt)
+
+    def logprob_fn(y):
+        return joint_logprob({Y_rv: y})
+
+    srng = RandomStream(seed=0)
+    kernel = hmc.kernel(srng, logprob_fn, scale_tt, at.as_tensor(100))
+
+    y_vv = Y_rv.clone()
+    initial_state = nuts.new_state(y_vv, logprob_fn)
+
+    trajectory, updates = aesara.scan(
+        kernel,
+        outputs_info=[
+            {"initial": initial_state[0]},
+            {"initial": initial_state[1]},
+            {"initial": initial_state[2]},
+            None,
+        ],
+        non_sequences=1.0,
+        n_steps=5000,
     )
 
     trajectory_generator = aesara.function((y_vv,), trajectory[0], updates=updates)
