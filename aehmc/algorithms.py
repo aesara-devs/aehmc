@@ -5,7 +5,7 @@ from aesara.tensor.var import TensorVariable
 
 
 def dual_averaging(
-    mu: float = 0.5, gamma: float = 0.05, t0: int = 10, kappa: float = 0.75
+    gamma: float = 0.05, t0: int = 10, kappa: float = 0.75
 ) -> Tuple[Callable, Callable]:
     """Dual averaging algorithm.
 
@@ -46,12 +46,12 @@ def dual_averaging(
     """
 
     def init(
-        x_init: TensorVariable,
-    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable]:
+        mu: TensorVariable,
+    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable, TensorVariable]:
         step = at.as_tensor(1, "step", dtype="int32")
-        gradient_avg = at.as_tensor(0, "gradient_avg", dtype=x_init.dtype)
-        x_avg = at.as_tensor(0.0, "x_avg", dtype=x_init.dtype)
-        return step, x_avg, gradient_avg
+        gradient_avg = at.as_tensor(0, "gradient_avg", dtype=mu.dtype)
+        x_avg = at.as_tensor(0.0, "x_avg", dtype=mu.dtype)
+        return step, x_avg, gradient_avg, mu
 
     def update(
         gradient: TensorVariable,
@@ -59,7 +59,10 @@ def dual_averaging(
         x: TensorVariable,
         x_avg: TensorVariable,
         gradient_avg: TensorVariable,
-    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable, TensorVariable]:
+        mu: TensorVariable,
+    ) -> Tuple[
+        TensorVariable, TensorVariable, TensorVariable, TensorVariable, TensorVariable
+    ]:
         """Update the state of the Dual Averaging algorithm.
 
         Parameters
@@ -96,6 +99,7 @@ def dual_averaging(
             new_x.astype("floatX"),
             new_x_avg.astype("floatX"),
             new_gradient_avg.astype("floatX"),
+            mu,
         )
 
     return init, update

@@ -14,13 +14,15 @@ def test_dual_averaging():
 
     init, update = algorithms.dual_averaging(gamma=0.5)
 
-    def one_step(step, x, x_avg, gradient_avg):
+    def one_step(step, x, x_avg, gradient_avg, mu):
         value = fn(x)
         gradient = aesara.grad(value, x)
-        return update(gradient, step, x, x_avg, gradient_avg)
+        return update(gradient, step, x, x_avg, gradient_avg, mu)
 
-    x_init = at.as_tensor(0.0, dtype="floatX")
-    step, x_avg, gradient_avg = init(x_init)
+    x_init = at.as_tensor(0, dtype="floatX")
+
+    mu = at.as_tensor(0.5, dtype="floatX")
+    step, x_avg, gradient_avg, mu = init(mu)
 
     states, updates = aesara.scan(
         fn=one_step,
@@ -29,6 +31,7 @@ def test_dual_averaging():
             {"initial": x_init},
             {"initial": x_avg},
             {"initial": gradient_avg},
+            {"initial": mu},
         ],
         n_steps=100,
     )

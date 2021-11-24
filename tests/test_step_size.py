@@ -43,13 +43,14 @@ def test_heuristic_adaptation(init):
 def test_dual_averaging_adaptation(init):
     initial_state, kernel = init
 
-    logpstepsize = at.log(at.as_tensor(1.0, dtype="floatX"))
-    init, update = dual_averaging_adaptation(logpstepsize)
-    step, logstepsize_avg, gradient_avg = init(at.as_tensor(0.0, dtype="floatX"))
+    stepsize = at.as_tensor(1.0, dtype="floatX")
+    logpstepsize = at.log(stepsize)
+    init, update = dual_averaging_adaptation()
+    step, logstepsize_avg, gradient_avg, mu = init(stepsize)
 
-    def one_step(q, logprob, logprob_grad, step, x_t, x_avg, gradient_avg):
+    def one_step(q, logprob, logprob_grad, step, x_t, x_avg, gradient_avg, mu):
         *state, p_accept = kernel(q, logprob, logprob_grad, at.exp(x_t))
-        da_state = update(p_accept, step, x_t, x_avg, gradient_avg)
+        da_state = update(p_accept, step, x_t, x_avg, gradient_avg, mu)
         return (*state, *da_state, p_accept)
 
     states, updates = aesara.scan(
@@ -62,13 +63,14 @@ def test_dual_averaging_adaptation(init):
             {"initial": logpstepsize},
             {"initial": logstepsize_avg},
             {"initial": gradient_avg},
+            {"initial": mu},
             None,
         ],
         n_steps=10_000,
     )
 
     p_accept = aesara.function((), states[-1], updates=updates)
-    step_size = aesara.function((), at.exp(states[-3][-1]), updates=updates)
+    step_size = aesara.function((), at.exp(states[-4][-1]), updates=updates)
     assert np.mean(p_accept()) == pytest.approx(0.65, rel=10e-3)
     assert step_size() < 10
     assert step_size() > 1e-1
