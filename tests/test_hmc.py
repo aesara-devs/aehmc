@@ -5,7 +5,6 @@ import numpy as np
 import pytest
 import scipy.stats as stats
 from aeppl import joint_logprob
-from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
 
 from aehmc import hmc, nuts
@@ -22,13 +21,13 @@ def test_hmc():
     inverse_mass_matrix = at.as_tensor(1.0)
     num_integration_steps = 10
 
-    Y_rv = at.random.normal(1, 2)
+    srng = at.random.RandomStream(seed=0)
+    Y_rv = srng.normal(1, 2)
 
     def logprob_fn(y):
         logprob = joint_logprob({Y_rv: y})
         return logprob
 
-    srng = RandomStream(seed=0)
     kernel = hmc.kernel(
         srng,
         logprob_fn,
@@ -63,13 +62,13 @@ def test_nuts():
     step_size = 1.0
     inverse_mass_matrix = at.as_tensor(1.0)
 
-    Y_rv = at.random.normal(1, 2)
+    srng = at.random.RandomStream(seed=0)
+    Y_rv = srng.normal(1, 2)
 
     def logprob_fn(y):
         logprob = joint_logprob({Y_rv: y})
         return logprob
 
-    srng = RandomStream(seed=0)
     kernel = nuts.kernel(
         srng,
         logprob_fn,
@@ -124,12 +123,13 @@ def test_nuts_mcse(p_val=0.01):
     loc_tt = at.as_tensor(loc)
     scale_tt = at.as_tensor(scale)
     cov_tt = at.as_tensor(cov)
-    Y_rv = at.random.multivariate_normal(loc_tt, cov_tt)
+
+    srng = at.random.RandomStream(seed=0)
+    Y_rv = srng.multivariate_normal(loc_tt, cov_tt)
 
     def logprob_fn(y):
         return joint_logprob({Y_rv: y})
 
-    srng = RandomStream(seed=0)
     kernel = nuts.kernel(
         srng,
         logprob_fn,
@@ -150,7 +150,7 @@ def test_nuts_mcse(p_val=0.01):
             None,
             None,
         ],
-        non_sequences=1.0,
+        non_sequences=0.5,
         n_steps=2000,
     )
 
@@ -183,12 +183,13 @@ def test_hmc_mcse(p_val=0.01):
     loc_tt = at.as_tensor(loc)
     scale_tt = at.as_tensor(scale)
     cov_tt = at.as_tensor(cov)
-    Y_rv = at.random.multivariate_normal(loc_tt, cov_tt)
+
+    srng = at.random.RandomStream(seed=1)
+    Y_rv = srng.multivariate_normal(loc_tt, cov_tt)
 
     def logprob_fn(y):
         return joint_logprob({Y_rv: y})
 
-    srng = RandomStream(seed=0)
     kernel = hmc.kernel(srng, logprob_fn, scale_tt, at.as_tensor(100))
 
     y_vv = Y_rv.clone()
@@ -202,7 +203,7 @@ def test_hmc_mcse(p_val=0.01):
             {"initial": initial_state[2]},
             None,
         ],
-        non_sequences=1.0,
+        non_sequences=0.5,
         n_steps=5000,
     )
 
