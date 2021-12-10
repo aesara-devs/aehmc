@@ -95,8 +95,8 @@ def kernel(
         initial_proposal = (
             initial_state,
             initial_energy,
-            at.as_tensor(0.0, dtype="float64"),
-            at.as_tensor(-np.inf, dtype="float64"),
+            at.as_tensor(0.0, dtype=np.float64),
+            at.as_tensor(-np.inf, dtype=np.float64),
         )
         result, updates = expand(
             initial_proposal,

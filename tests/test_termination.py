@@ -59,7 +59,7 @@ def test_termination_update(num_dims):
     num_doublings = at.as_tensor(4)
     termination_state = new_state(position, num_doublings)
 
-    step = at.scalar("step", dtype="int32")
+    step = at.scalar("step", dtype=np.int32)
     updated = update(termination_state, momentum_sum, momentum, step)
     update_fn = aesara.function((step,), updated, on_unused_input="ignore")
 

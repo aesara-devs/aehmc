@@ -2,6 +2,7 @@ from typing import Callable, Dict, Tuple
 
 import aesara
 import aesara.tensor as at
+from aesara import config
 from aesara.scan.utils import until
 from aesara.tensor.var import TensorVariable
 
@@ -150,7 +151,16 @@ def heuristic_adaptation(
             until(at.neq(direction, previous_direction)),
         )
 
-    (step_sizes, _, _), _ = aesara.scan(
+        is_not_first_step = at.neq(previous_direction, at.constant(0))
+        has_crossed_threshold = at.neq(direction, previous_direction)
+        stop_iterating = is_not_first_step & has_crossed_threshold
+
+        return (
+            (step_size.astype(config.floatX), new_direction, direction),
+            until(stop_iterating),
+        )
+
+    (step_sizes, _, _), updates = aesara.scan(
         fn=update,
         outputs_info=[
             {"initial": initial_step_size},

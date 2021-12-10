@@ -1,6 +1,8 @@
 from typing import Callable, Tuple
 
 import aesara.tensor as at
+import numpy as np
+from aesara import config
 from aesara.tensor.var import TensorVariable
 
 
@@ -46,12 +48,12 @@ def dual_averaging(
     """
 
     def init(
-        x_init: TensorVariable,
-    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable]:
-        step = at.as_tensor(1, "step", dtype="int32")
-        gradient_avg = at.as_tensor(0, "gradient_avg", dtype=x_init.dtype)
-        x_avg = at.as_tensor(0.0, "x_avg", dtype=x_init.dtype)
-        return step, x_avg, gradient_avg
+        mu: TensorVariable,
+    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable, TensorVariable]:
+        step = at.as_tensor(1, "step", dtype=np.int32)
+        gradient_avg = at.as_tensor(0, "gradient_avg", dtype=mu.dtype)
+        x_avg = at.as_tensor(0.0, "x_avg", dtype=mu.dtype)
+        return step, x_avg, gradient_avg, mu
 
     def update(
         gradient: TensorVariable,
@@ -92,10 +94,11 @@ def dual_averaging(
         new_x_avg = x_eta * x + (1.0 - x_eta) * x_avg
 
         return (
-            step + 1,
-            new_x.astype("floatX"),
-            new_x_avg.astype("floatX"),
-            new_gradient_avg.astype("floatX"),
+            (step + 1).astype(np.int32),
+            new_x.astype(config.floatX),
+            new_x_avg.astype(config.floatX),
+            new_gradient_avg.astype(config.floatX),
+            mu,
         )
 
     return init, update
@@ -131,16 +134,20 @@ def welford_covariance(compute_covariance: bool) -> Tuple[Callable, Callable, Ca
             The number of dimensions of the problem.
 
         """
-        sample_size = at.as_tensor(0, dtype="int32")
+        sample_size = at.as_tensor(0, dtype=np.int32)
 
         if n_dims == 0:
-            return at.as_tensor(0), at.as_tensor(0), sample_size
+            return (
+                at.as_tensor(0, dtype=config.floatX),
+                at.as_tensor(0, dtype=config.floatX),
+                sample_size,
+            )
 
-        mean = at.zeros((n_dims,))
+        mean = at.zeros((n_dims,), dtype=config.floatX)
         if compute_covariance:
-            m2 = at.zeros((n_dims, n_dims))
+            m2 = at.zeros((n_dims, n_dims), dtype=config.floatX)
         else:
-            m2 = at.zeros((n_dims,))
+            m2 = at.zeros((n_dims,), dtype=config.floatX)
         return mean, m2, sample_size
 
     def update(

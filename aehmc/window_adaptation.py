@@ -1,4 +1,181 @@
-from typing import List, Tuple
+from typing import Callable, List, Tuple
+
+import aesara
+import aesara.tensor as at
+from aesara import config
+from aesara.tensor.shape import shape_tuple
+from aesara.tensor.var import TensorVariable
+
+from aehmc.mass_matrix import covariance_adaptation
+from aehmc.step_size import dual_averaging_adaptation, heuristic_adaptation
+
+
+def run(
+    kernel_factory,
+    initial_state,
+    num_steps=1000,
+    *,
+    is_mass_matrix_full=False,
+    initial_step_size=at.as_tensor(0.5, dtype=config.floatX),
+    target_acceptance_rate=0.65
+):
+    init, update, final = window_adaptation(
+        kernel_factory, is_mass_matrix_full, initial_step_size, target_acceptance_rate
+    )
+
+    def one_step(
+        stage,  # schedule
+        is_middle_window_end,
+        q,  # chain state
+        potential_energy,
+        potential_energy_grad,
+        step,  # Dual Averagin adaptation state
+        log_step_size,
+        log_step_size_avg,
+        gradient_avg,
+        mu,
+        mean,  # Mass matrix adaptation state
+        m2,
+        sample_size,
+    ):
+        chain_state = (q, potential_energy, potential_energy_grad)
+        warmup_state = (
+            (step, log_step_size, log_step_size_avg, gradient_avg, mu),
+            (mean, m2, sample_size),
+        )
+
+        chain_state, warmup_state, updates = update(
+            stage, is_middle_window_end, chain_state, warmup_state
+        )
+
+        return (*chain_state, *warmup_state[0], *warmup_state[1]), updates
+
+    schedule = build_schedule(num_steps)
+    stage = at.as_tensor([s[0] for s in schedule])
+    is_middle_window_end = at.as_tensor([s[1] for s in schedule])
+
+    da_state, mm_state = init(initial_state)
+    state, updates = aesara.scan(
+        fn=one_step,
+        outputs_info=(*initial_state, *da_state, *mm_state),
+        sequences=(stage, is_middle_window_end),
+    )
+
+    last_chain_state = (state[0][-1], state[1][-1], state[2][-1])
+    last_warmup_state = (
+        (state[3][-1], state[4][-1], state[5][-1], state[6][-1], state[7][-1]),
+        (state[8][-1], state[9][-1], state[10][-1]),
+    )
+
+    step_size, inverse_mass_matrix = final(last_warmup_state)
+
+    return (last_chain_state, (step_size, inverse_mass_matrix)), updates
+
+
+def window_adaptation(
+    kernel_factory: Callable[[TensorVariable], Callable],
+    is_mass_matrix_full: bool = False,
+    initial_step_size: TensorVariable = at.as_tensor(1.0, dtype=config.floatX),
+    target_acceptance_rate: TensorVariable = 0.65,
+):
+    mm_init, mm_update, mm_final = covariance_adaptation(is_mass_matrix_full)
+    da_init, da_update = dual_averaging_adaptation(target_acceptance_rate)
+
+    def init(initial_chain_state: Tuple):
+        if initial_chain_state[0].ndim == 0:
+            num_dims = 0
+        else:
+            num_dims = shape_tuple(initial_chain_state[0])[0]
+        inverse_mass_matrix, mm_state = mm_init(num_dims)
+
+        kernel = kernel_factory(inverse_mass_matrix)
+        step_size = heuristic_adaptation(
+            kernel, initial_chain_state, initial_step_size, target_acceptance_rate
+        )
+        step, logstepsize_avg, gradient_avg, mu = da_init(step_size)
+
+        return (step, at.log(step_size), logstepsize_avg, gradient_avg, mu), mm_state
+
+    def fast_update(p_accept, da_state, mm_state):
+        da_state = da_update(p_accept, *da_state)
+        return (da_state, mm_state)
+
+    def slow_update(position, p_accept, da_state, mm_state):
+        da_state = da_update(p_accept, *da_state)
+        mm_state = mm_update(position, mm_state)
+        return (da_state, mm_state)
+
+    def slow_final(warmup_state):
+        """We recompute the inverse mass matrix and re-initialize the dual averaging scheme at the end of each 'slow window'."""
+        da_state, mm_state = warmup_state
+        mm_final(mm_state)
+        step, logstepsize_avg, gradient_avg, mu = da_init(at.exp(da_state[2]))
+        return ((step, da_state[2], logstepsize_avg, gradient_avg, mu), mm_state)
+
+    def update(
+        stage: int, is_middle_window_end: bool, chain_state: Tuple, warmup_state: Tuple
+    ):
+        da_state, mm_state = warmup_state
+        step_size = at.exp(da_state[2])
+        inverse_mass_matrix = mm_final(mm_state)
+
+        kernel = kernel_factory(inverse_mass_matrix)
+        (*chain_state, p_accept, _, _, _), updates = kernel(*chain_state, step_size)
+
+        warmup_state = where_warmup_state(
+            at.eq(stage, 0),
+            fast_update(p_accept, da_state, mm_state),
+            slow_update(chain_state[0], p_accept, da_state, mm_state),
+        )
+        warmup_state = where_warmup_state(
+            is_middle_window_end, slow_final(warmup_state), warmup_state
+        )
+
+        return chain_state, warmup_state, updates
+
+    def where_warmup_state(do_pick_left, left_warmup_state, right_warmup_state):
+        (
+            left_step,
+            left_logstepsize,
+            left_logstepsize_avg,
+            left_gradient_avg,
+            left_mu,
+        ) = left_warmup_state[0]
+        (
+            right_step,
+            right_logstepsize,
+            right_logstepsize_avg,
+            right_gradient_avg,
+            right_mu,
+        ) = right_warmup_state[0]
+
+        step = at.where(do_pick_left, left_step, right_step)
+        logstepsize = at.where(do_pick_left, left_logstepsize, right_logstepsize)
+        logstepsize_avg = at.where(
+            do_pick_left, left_logstepsize_avg, right_logstepsize_avg
+        )
+        gradient_avg = at.where(do_pick_left, left_gradient_avg, right_gradient_avg)
+        mu = at.where(do_pick_left, left_mu, right_mu)
+
+        right_mean, right_m2, right_sample_size = right_warmup_state[1]
+        left_mean, left_m2, left_sample_size = left_warmup_state[1]
+        mean = at.where(do_pick_left, left_mean, right_mean)
+        m2 = at.where(do_pick_left, left_m2, right_m2)
+        sample_size = at.where(do_pick_left, left_sample_size, right_sample_size)
+
+        return (step, logstepsize, logstepsize_avg, gradient_avg, mu), (
+            mean,
+            m2,
+            sample_size,
+        )
+
+    def final(warmup_state: Tuple) -> Tuple[TensorVariable, TensorVariable]:
+        da_state, mm_state = warmup_state
+        step_size = at.exp(da_state[3])
+        inverse_mass_matrix = mm_final(mm_state)
+        return step_size, inverse_mass_matrix
+
+    return init, update, final
 
 
 def build_schedule(
