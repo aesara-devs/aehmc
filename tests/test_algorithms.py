@@ -2,6 +2,7 @@ import aesara
 import aesara.tensor as at
 import numpy as np
 import pytest
+from aesara import config
 
 from aehmc import algorithms
 
@@ -19,8 +20,10 @@ def test_dual_averaging():
         gradient = aesara.grad(value, x)
         return update(gradient, step, x, x_avg, gradient_avg)
 
-    x_init = at.as_tensor(0.0, dtype="floatX")
-    step, x_avg, gradient_avg = init(x_init)
+    x_init = at.as_tensor(0, dtype=config.floatX)
+
+    mu = at.as_tensor(0.5, dtype=config.floatX)
+    step, x_avg, gradient_avg, mu = init(mu)
 
     states, updates = aesara.scan(
         fn=one_step,

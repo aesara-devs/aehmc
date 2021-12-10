@@ -2,6 +2,7 @@ import aesara
 import aesara.tensor as at
 import numpy as np
 import pytest
+from aesara import config
 from aesara.tensor.random.utils import RandomStream
 
 from aehmc import hmc
@@ -17,8 +18,8 @@ def init():
     inverse_mass_matrix = at.as_tensor(1.0)
     kernel = hmc.kernel(srng, logprob_fn, inverse_mass_matrix, 10)
 
-    initial_position = at.as_tensor(1.0, dtype="floatX")
-    initial_state = hmc.new_state(initial_position, logprob_fn)
+    initial_position = at.as_tensor(1.0, dtype=config.floatX)
+    initial_state = nuts.new_state(initial_position, logprob_fn)
 
     return initial_state, kernel
 
@@ -27,13 +28,13 @@ def test_heuristic_adaptation(init):
     reference_state, kernel = init
 
     epsilon_1 = heuristic_adaptation(
-        kernel, reference_state, at.as_tensor(0.5, dtype="floatX"), 0.95
+        kernel, reference_state, at.as_tensor(0.5, dtype=config.floatX), 0.95
     )
     epsilon_1_val = epsilon_1.eval()
     assert epsilon_1_val != np.inf
 
     epsilon_2 = heuristic_adaptation(
-        kernel, reference_state, at.as_tensor(0.5, dtype="floatX"), 0.05
+        kernel, reference_state, at.as_tensor(0.5, dtype=config.floatX), 0.05
     )
     epsilon_2_val = epsilon_2.eval()
     assert epsilon_2_val > epsilon_1_val
@@ -43,9 +44,10 @@ def test_heuristic_adaptation(init):
 def test_dual_averaging_adaptation(init):
     initial_state, kernel = init
 
-    logpstepsize = at.log(at.as_tensor(1.0, dtype="floatX"))
-    init, update = dual_averaging_adaptation(logpstepsize)
-    step, logstepsize_avg, gradient_avg = init(at.as_tensor(0.0, dtype="floatX"))
+    stepsize = at.as_tensor(1.0, dtype=config.floatX)
+    logpstepsize = at.log(stepsize)
+    init, update = dual_averaging_adaptation()
+    step, logstepsize_avg, gradient_avg, mu = init(stepsize)
 
     def one_step(q, logprob, logprob_grad, step, x_t, x_avg, gradient_avg):
         (*state, p_accept), inner_updates = kernel(

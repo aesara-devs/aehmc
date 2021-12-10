@@ -150,8 +150,8 @@ def test_multiplicative_expansion(
         return 0.5 * at.sum(at.square(x))
 
     step_size = at.as_tensor(step_size)
-    inverse_mass_matrix = at.as_tensor(1.0, dtype="float64")
-    position = at.as_tensor(1.0, dtype="float64")
+    inverse_mass_matrix = at.as_tensor(1.0, dtype=np.float64)
+    position = at.as_tensor(1.0, dtype=np.float64)
 
     momentum_generator, kinetic_energy_fn, uturn_check_fn = gaussian_metric(
         inverse_mass_matrix
@@ -180,8 +180,8 @@ def test_multiplicative_expansion(
     proposal = (
         state,
         energy,
-        at.as_tensor(0.0, dtype="float64"),
-        at.as_tensor(-np.inf, dtype="float64"),
+        at.as_tensor(0.0, dtype=np.float64),
+        at.as_tensor(-np.inf, dtype=np.float64),
     )
     termination_state = new_criterion_state(state[0], 10)
     result, updates = expand(
