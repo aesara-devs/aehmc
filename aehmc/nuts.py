@@ -1,6 +1,6 @@
 from typing import Callable
 
-import aesara.tensor as aet
+import aesara.tensor as at
 import numpy as np
 from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
@@ -95,8 +95,8 @@ def kernel(
         initial_proposal = (
             initial_state,
             initial_energy,
-            aet.as_tensor(0.0, dtype="float64"),
-            aet.as_tensor(-np.inf, dtype="float64"),
+            at.as_tensor(0.0, dtype="float64"),
+            at.as_tensor(-np.inf, dtype="float64"),
         )
         result, updates = expand(
             initial_proposal,

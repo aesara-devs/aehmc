@@ -1,6 +1,6 @@
 from typing import Callable, Tuple
 
-import aesara.tensor as aet
+import aesara.tensor as at
 import aesara.tensor.slinalg as slinalg
 from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.shape import shape_tuple
@@ -50,18 +50,18 @@ def gaussian_metric(
 
     if inverse_mass_matrix.ndim == 0:
         shape: Tuple = ()
-        mass_matrix_sqrt = aet.sqrt(aet.reciprocal(inverse_mass_matrix))
+        mass_matrix_sqrt = at.sqrt(at.reciprocal(inverse_mass_matrix))
         dot, matmul = lambda x, y: x * y, lambda x, y: x * y
     elif inverse_mass_matrix.ndim == 1:
         shape = (shape_tuple(inverse_mass_matrix)[0],)
-        mass_matrix_sqrt = aet.sqrt(aet.reciprocal(inverse_mass_matrix))
-        dot, matmul = aet.dot, lambda x, y: x * y
+        mass_matrix_sqrt = at.sqrt(at.reciprocal(inverse_mass_matrix))
+        dot, matmul = at.dot, lambda x, y: x * y
     elif inverse_mass_matrix.ndim == 2:
         shape = (shape_tuple(inverse_mass_matrix)[0],)
         tril_inv = slinalg.cholesky(inverse_mass_matrix)
-        identity = aet.eye(*shape)
+        identity = at.eye(*shape)
         mass_matrix_sqrt = slinalg.solve_lower_triangular(tril_inv, identity)
-        dot, matmul = aet.dot, aet.dot
+        dot, matmul = at.dot, at.dot
     else:
         raise ValueError(
             f"Expected a mass matrix of dimension 1 (diagonal) or 2, got {inverse_mass_matrix.ndim}"
@@ -101,8 +101,8 @@ def gaussian_metric(
         velocity_right = matmul(inverse_mass_matrix, momentum_right)
 
         rho = momentum_sum - (momentum_right + momentum_left) / 2
-        turning_at_left = aet.dot(velocity_left, rho) <= 0
-        turning_at_right = aet.dot(velocity_right, rho) <= 0
+        turning_at_left = at.dot(velocity_left, rho) <= 0
+        turning_at_right = at.dot(velocity_right, rho) <= 0
 
         is_turning = turning_at_left | turning_at_right
 

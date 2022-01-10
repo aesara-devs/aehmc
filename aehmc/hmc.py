@@ -1,7 +1,7 @@
 from typing import Callable, Tuple
 
 import aesara
-import aesara.tensor as aet
+import aesara.tensor as at
 import numpy as np
 from aesara.ifelse import ifelse
 from aesara.tensor.random.utils import RandomStream
@@ -125,10 +125,10 @@ def hmc_proposal(
         energy = potential_energy + kinetic_energy(p)
         new_energy = new_potential_energy + kinetic_energy(flipped_p)
         delta_energy = energy - new_energy
-        delta_energy = aet.where(aet.isnan(delta_energy), -np.inf, delta_energy)
-        # is_transition_divergence = aet.abs(delta_energy) > divergence_threshold
+        delta_energy = at.where(at.isnan(delta_energy), -np.inf, delta_energy)
+        # is_transition_divergence = at.abs(delta_energy) > divergence_threshold
 
-        p_accept = aet.clip(aet.exp(delta_energy), 0, 1.0)
+        p_accept = at.clip(at.exp(delta_energy), 0, 1.0)
         do_accept = srng.bernoulli(p_accept)
         (
             final_q,

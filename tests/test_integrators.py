@@ -1,5 +1,5 @@
 import aesara
-import aesara.tensor as aet
+import aesara.tensor as at
 import numpy as np
 import pytest
 from aesara.tensor.var import TensorVariable
@@ -11,11 +11,11 @@ def HarmonicOscillator(inverse_mass_matrix, k=1.0, m=1.0):
     """Potential and Kinetic energy of an harmonic oscillator."""
 
     def potential_energy(x: TensorVariable) -> TensorVariable:
-        return aet.sum(0.5 * k * aet.square(x))
+        return at.sum(0.5 * k * at.square(x))
 
     def kinetic_energy(p: TensorVariable) -> TensorVariable:
         v = inverse_mass_matrix * p
-        return aet.sum(0.5 * aet.dot(v, p))
+        return at.sum(0.5 * at.dot(v, p))
 
     return potential_energy, kinetic_energy
 
@@ -24,21 +24,21 @@ def FreeFall(inverse_mass_matrix, g=1.0):
     """Potential and kinetic energy of a free-falling object."""
 
     def potential_energy(h: TensorVariable) -> TensorVariable:
-        return aet.sum(g * h)
+        return at.sum(g * h)
 
     def kinetic_energy(p: TensorVariable) -> TensorVariable:
         v = inverse_mass_matrix * p
-        return aet.sum(0.5 * aet.dot(v, p))
+        return at.sum(0.5 * at.dot(v, p))
 
     return potential_energy, kinetic_energy
 
 
 def CircularMotion(inverse_mass_matrix):
     def potential_energy(q: TensorVariable) -> TensorVariable:
-        return -1.0 / aet.power(aet.square(q[0]) + aet.square(q[1]), 0.5)
+        return -1.0 / at.power(at.square(q[0]) + at.square(q[1]), 0.5)
 
     def kinetic_energy(p: TensorVariable) -> TensorVariable:
-        return 0.5 * aet.dot(inverse_mass_matrix, aet.square(p))
+        return 0.5 * at.dot(inverse_mass_matrix, at.square(p))
 
     return potential_energy, kinetic_energy
 
@@ -78,9 +78,9 @@ integration_examples = [
 
 
 def create_integrate_fn(potential, step_fn, n_steps):
-    q = aet.vector("q")
-    p = aet.vector("p")
-    step_size = aet.scalar("step_size")
+    q = at.vector("q")
+    p = at.vector("p")
+    step_size = at.scalar("step_size")
     energy = potential(q)
     energy_grad = aesara.grad(energy, q)
     trajectory, _ = aesara.scan(
@@ -109,9 +109,9 @@ def test_velocity_verlet(example):
     potential, kinetic_energy = model(inverse_mass_matrix)
     step = velocity_verlet(potential, kinetic_energy)
 
-    q = aet.vector("q")
-    p = aet.vector("p")
-    p_final = aet.vector("p_final")
+    q = at.vector("q")
+    p = at.vector("p")
+    p_final = at.vector("p_final")
     energy_at = potential(q) + kinetic_energy(p)
     energy_fn = aesara.function((q, p), energy_at)
 

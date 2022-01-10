@@ -1,6 +1,6 @@
 from typing import Callable, Tuple
 
-import aesara.tensor as aet
+import aesara.tensor as at
 import numpy as np
 from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
@@ -39,11 +39,11 @@ def proposal_generator(kinetic_energy: Callable, divergence_threshold: float):
         new_energy = potential_energy + kinetic_energy(p)
 
         delta_energy = initial_energy - new_energy
-        delta_energy = aet.where(aet.isnan(delta_energy), -np.inf, delta_energy)
-        is_transition_divergent = aet.abs_(delta_energy) > divergence_threshold
+        delta_energy = at.where(at.isnan(delta_energy), -np.inf, delta_energy)
+        is_transition_divergent = at.abs_(delta_energy) > divergence_threshold
 
         weight = delta_energy
-        p_accept = aet.clip(aet.exp(delta_energy), 0.0, 1.0)
+        p_accept = at.clip(at.exp(delta_energy), 0.0, 1.0)
 
         return (state, new_energy, weight, p_accept), is_transition_divergent
 
@@ -81,7 +81,7 @@ def progressive_uniform_sampling(
     state, energy, weight, _ = proposal
     new_state, new_energy, new_weight, _ = new_proposal
 
-    p_accept = aet.expit(new_weight - weight)
+    p_accept = at.expit(new_weight - weight)
     do_accept = srng.bernoulli(p_accept)
     updated_proposal = maybe_update_proposal(do_accept, proposal, new_proposal)
 
@@ -116,7 +116,7 @@ def progressive_biased_sampling(
     state, energy, weight, _ = proposal
     new_state, new_energy, new_weight, _ = new_proposal
 
-    p_accept = aet.clip(aet.exp(new_weight - weight), 0.0, 1.0)
+    p_accept = at.clip(at.exp(new_weight - weight), 0.0, 1.0)
     do_accept = srng.bernoulli(p_accept)
     updated_proposal = maybe_update_proposal(do_accept, proposal, new_proposal)
 
@@ -130,14 +130,14 @@ def maybe_update_proposal(
     state, energy, weight, sum_p_accept = proposal
     new_state, new_energy, new_weight, new_sum_p_accept = new_proposal
 
-    updated_weight = aet.logaddexp(weight, new_weight)
+    updated_weight = at.logaddexp(weight, new_weight)
     updated_sum_p_accept = sum_p_accept + new_sum_p_accept
 
-    updated_q = aet.where(do_accept, new_state[0], state[0])
-    updated_p = aet.where(do_accept, new_state[1], state[1])
-    updated_potential_energy = aet.where(do_accept, new_state[2], state[2])
-    updated_potential_energy_grad = aet.where(do_accept, new_state[3], state[3])
-    updated_energy = aet.where(do_accept, new_energy, energy)
+    updated_q = at.where(do_accept, new_state[0], state[0])
+    updated_p = at.where(do_accept, new_state[1], state[1])
+    updated_potential_energy = at.where(do_accept, new_state[2], state[2])
+    updated_potential_energy_grad = at.where(do_accept, new_state[3], state[3])
+    updated_energy = at.where(do_accept, new_energy, energy)
 
     return (
         (updated_q, updated_p, updated_potential_energy, updated_potential_energy_grad),

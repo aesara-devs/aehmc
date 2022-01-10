@@ -1,7 +1,7 @@
 from typing import Callable, Tuple
 
 import aesara
-import aesara.tensor as aet
+import aesara.tensor as at
 from aesara.ifelse import ifelse
 from aesara.scan.utils import until
 from aesara.tensor.var import TensorVariable
@@ -49,18 +49,18 @@ def iterative_uturn(is_turning_fn: Callable):
         """
         if position.ndim == 0:
             return (
-                aet.zeros(max_num_doublings),
-                aet.zeros(max_num_doublings),
-                aet.constant(0, dtype="int32"),
-                aet.constant(0, dtype="int32"),
+                at.zeros(max_num_doublings),
+                at.zeros(max_num_doublings),
+                at.constant(0, dtype="int32"),
+                at.constant(0, dtype="int32"),
             )
         else:
             num_dims = position.shape[0]
             return (
-                aet.zeros((max_num_doublings, num_dims)),
-                aet.zeros((max_num_doublings, num_dims)),
-                aet.constant(0, dtype="int32"),
-                aet.constant(0, dtype="int32"),
+                at.zeros((max_num_doublings, num_dims)),
+                at.zeros((max_num_doublings, num_dims)),
+                at.constant(0, dtype="int32"),
+                at.constant(0, dtype="int32"),
             )
 
     def update(
@@ -89,17 +89,17 @@ def iterative_uturn(is_turning_fn: Callable):
         """
         momentum_ckpt, momentum_sum_ckpt, *_ = state
         idx_min, idx_max = ifelse(
-            aet.eq(step, 0), (state[2], state[3]), _find_storage_indices(step)
+            at.eq(step, 0), (state[2], state[3]), _find_storage_indices(step)
         )
 
-        momentum_ckpt = aet.where(
-            aet.eq(step % 2, 0),
-            aet.set_subtensor(momentum_ckpt[idx_max], momentum),
+        momentum_ckpt = at.where(
+            at.eq(step % 2, 0),
+            at.set_subtensor(momentum_ckpt[idx_max], momentum),
             momentum_ckpt,
         )
-        momentum_sum_ckpt = aet.where(
-            aet.eq(step % 2, 0),
-            aet.set_subtensor(momentum_sum_ckpt[idx_max], momentum_sum),
+        momentum_sum_ckpt = at.where(
+            at.eq(step % 2, 0),
+            at.set_subtensor(momentum_sum_ckpt[idx_max], momentum_sum),
             momentum_sum_ckpt,
         )
 
@@ -121,7 +121,7 @@ def iterative_uturn(is_turning_fn: Callable):
         """
 
         def count_subtrees(nc0, nc1):
-            do_stop = aet.eq(nc0 & 1, 0)
+            do_stop = at.eq(nc0 & 1, 0)
             new_nc0 = nc0 // 2
             new_nc1 = nc1 + 1
             return (new_nc0, new_nc1), until(do_stop)
@@ -134,13 +134,13 @@ def iterative_uturn(is_turning_fn: Callable):
         num_subtrees = nc1[-1]
 
         def find_idx_max(nc0, nc1):
-            do_stop = aet.eq(nc0, 0)
+            do_stop = at.eq(nc0, 0)
             new_nc0 = nc0 // 2
             new_nc1 = nc1 + (nc0 & 1)
             return (new_nc0, new_nc1), until(do_stop)
 
-        init = aet.as_tensor(step // 2).astype("int32")
-        init_nc1 = aet.constant(0).astype("int32")
+        init = at.as_tensor(step // 2).astype("int32")
+        init_nc1 = at.constant(0).astype("int32")
         (nc0, nc1), _ = aesara.scan(
             find_idx_max, outputs_info=(init, init_nc1), n_steps=step + 1
         )
@@ -189,15 +189,15 @@ def iterative_uturn(is_turning_fn: Callable):
             is_turning = is_turning_fn(
                 momentum_ckpts[i], momentum, subtree_momentum_sum
             )
-            reached_max_iteration = aet.lt(i - 1, idx_min)
-            do_stop = aet.any(is_turning | reached_max_iteration)
+            reached_max_iteration = at.lt(i - 1, idx_min)
+            do_stop = at.any(is_turning | reached_max_iteration)
             return (i - 1, is_turning), until(do_stop)
 
         val, _ = aesara.scan(body_fn, outputs_info=(idx_max, None), n_steps=idx_max + 2)
 
         is_turning = val[1][-1]
-        is_turning = aet.where(
-            aet.lt(idx_max, idx_min), aet.as_tensor(0, dtype="bool"), is_turning
+        is_turning = at.where(
+            at.lt(idx_max, idx_min), at.as_tensor(0, dtype="bool"), is_turning
         )
 
         return is_turning
