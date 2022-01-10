@@ -1,5 +1,5 @@
 import aesara
-import aesara.tensor as aet
+import aesara.tensor as at
 import numpy as np
 import pytest
 from aesara.tensor.random.utils import RandomStream
@@ -21,11 +21,11 @@ def test_gaussian_metric_momentum(case):
 
     # Momentum
     if np.ndim(inverse_mass_matrix_val) == 0:
-        inverse_mass_matrix = aet.scalar("inverse_mass_matrix")
+        inverse_mass_matrix = at.scalar("inverse_mass_matrix")
     elif np.ndim(inverse_mass_matrix_val) == 1:
-        inverse_mass_matrix = aet.vector("inverse_mass_matrix")
+        inverse_mass_matrix = at.vector("inverse_mass_matrix")
     else:
-        inverse_mass_matrix = aet.matrix("inverse_mass_matrix")
+        inverse_mass_matrix = at.matrix("inverse_mass_matrix")
     momentum_fn, _, _ = gaussian_metric(inverse_mass_matrix)
     srng = RandomStream(seed=59)
     momentum_generator = aesara.function([inverse_mass_matrix], momentum_fn(srng))
@@ -47,12 +47,12 @@ def test_gaussian_metric_kinetic_energy(case):
     inverse_mass_matrix_val, momentum_val, expected_energy = case
 
     if inverse_mass_matrix_val.ndim == 1:
-        inverse_mass_matrix = aet.vector("inverse_mass_matrix")
+        inverse_mass_matrix = at.vector("inverse_mass_matrix")
     else:
-        inverse_mass_matrix = aet.matrix("inverse_mass_matrix")
+        inverse_mass_matrix = at.matrix("inverse_mass_matrix")
 
     _, kinetic_energy_fn, _ = gaussian_metric(inverse_mass_matrix)
-    momentum = aet.vector("momentum")
+    momentum = at.vector("momentum")
     kinetic_energy = aesara.function(
         (inverse_mass_matrix, momentum), kinetic_energy_fn(momentum)
     )
@@ -67,15 +67,15 @@ turning_test_cases = [np.array([1.0, 1.0]), np.array([[1.0, 0.0], [0.0, 1.0]])]
 def test_turning(inverse_mass_matrix_val):
 
     if inverse_mass_matrix_val.ndim == 1:
-        inverse_mass_matrix = aet.vector("inverse_mass_matrix")
+        inverse_mass_matrix = at.vector("inverse_mass_matrix")
     else:
-        inverse_mass_matrix = aet.matrix("inverse_mass_matrix")
+        inverse_mass_matrix = at.matrix("inverse_mass_matrix")
 
     _, _, turning_fn = gaussian_metric(inverse_mass_matrix)
 
-    p_left = aet.vector("p_left")
-    p_right = aet.vector("p_right")
-    p_sum = aet.vector("p_sum")
+    p_left = at.vector("p_left")
+    p_right = at.vector("p_right")
+    p_sum = at.vector("p_sum")
     is_turning_fn = aesara.function(
         (inverse_mass_matrix, p_left, p_right, p_sum),
         turning_fn(p_left, p_right, p_sum),

@@ -1,5 +1,5 @@
 import aesara
-import aesara.tensor as aet
+import aesara.tensor as at
 import numpy as np
 import pytest
 from aeppl.logprob import logprob
@@ -21,10 +21,10 @@ aesara.config.exception_verbosity = "high"
 
 def CircularMotion(inverse_mass_matrix):
     def potential_energy(q: TensorVariable) -> TensorVariable:
-        return -1.0 / aet.power(aet.square(q[0]) + aet.square(q[1]), 0.5)
+        return -1.0 / at.power(at.square(q[0]) + at.square(q[1]), 0.5)
 
     def kinetic_energy(p: TensorVariable) -> TensorVariable:
-        return 0.5 * aet.dot(inverse_mass_matrix, aet.square(p))
+        return 0.5 * at.dot(inverse_mass_matrix, at.square(p))
 
     return potential_energy, kinetic_energy
 
@@ -54,8 +54,8 @@ def test_static_integration(example):
     step = velocity_verlet(potential, kinetic_energy)
     integrator = static_integration(step, num_steps)
 
-    q = aet.vector("q")
-    p = aet.vector("p")
+    q = at.vector("q")
+    p = at.vector("p")
     energy = potential(q)
     energy_grad = aesara.grad(energy, q)
     final_state = integrator(q, p, energy, energy_grad, step_size)
@@ -78,12 +78,12 @@ def test_dynamic_integration(case):
     srng = RandomStream(seed=59)
 
     def potential_fn(x):
-        return -aet.sum(logprob(aet.random.normal(0.0, 1.0), x))
+        return -at.sum(logprob(at.random.normal(0.0, 1.0), x))
 
     step_size, should_diverge, should_turn = case
 
     # Set up the trajectory integrator
-    inverse_mass_matrix = aet.ones(1)
+    inverse_mass_matrix = at.ones(1)
 
     momentum_generator, kinetic_energy_fn, uturn_check_fn = gaussian_metric(
         inverse_mass_matrix
@@ -101,15 +101,15 @@ def test_dynamic_integration(case):
         kinetic_energy_fn,
         update_criterion_state,
         is_criterion_met,
-        divergence_threshold=aet.as_tensor(1000),
+        divergence_threshold=at.as_tensor(1000),
     )
 
     # Initialize the state
-    direction = aet.as_tensor(1)
-    step_size = aet.as_tensor(step_size)
-    max_num_steps = aet.as_tensor(10)
-    num_doublings = aet.as_tensor(10)
-    position = aet.as_tensor(np.ones(1))
+    direction = at.as_tensor(1)
+    step_size = at.as_tensor(step_size)
+    max_num_steps = at.as_tensor(10)
+    num_doublings = at.as_tensor(10)
+    position = at.as_tensor(np.ones(1))
 
     initial_state = new_integrator_state(
         potential_fn, position, momentum_generator(srng)
@@ -147,11 +147,11 @@ def test_multiplicative_expansion(
     srng = RandomStream(seed=59)
 
     def potential_fn(x):
-        return 0.5 * aet.sum(aet.square(x))
+        return 0.5 * at.sum(at.square(x))
 
-    step_size = aet.as_tensor(step_size)
-    inverse_mass_matrix = aet.as_tensor(1.0, dtype="float64")
-    position = aet.as_tensor(1.0, dtype="float64")
+    step_size = at.as_tensor(step_size)
+    inverse_mass_matrix = at.as_tensor(1.0, dtype="float64")
+    position = at.as_tensor(1.0, dtype="float64")
 
     momentum_generator, kinetic_energy_fn, uturn_check_fn = gaussian_metric(
         inverse_mass_matrix
@@ -169,7 +169,7 @@ def test_multiplicative_expansion(
         kinetic_energy_fn,
         update_criterion_state,
         is_criterion_met,
-        divergence_threshold=aet.as_tensor(1000),
+        divergence_threshold=at.as_tensor(1000),
     )
 
     expand = multiplicative_expansion(srng, trajectory_integrator, uturn_check_fn, 10)
@@ -180,8 +180,8 @@ def test_multiplicative_expansion(
     proposal = (
         state,
         energy,
-        aet.as_tensor(0.0, dtype="float64"),
-        aet.as_tensor(-np.inf, dtype="float64"),
+        at.as_tensor(0.0, dtype="float64"),
+        at.as_tensor(-np.inf, dtype="float64"),
     )
     termination_state = new_criterion_state(state[0], 10)
     result, updates = expand(

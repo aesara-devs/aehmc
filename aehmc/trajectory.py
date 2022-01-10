@@ -1,7 +1,7 @@
 from typing import Callable, Tuple
 
 import aesara
-import aesara.tensor as aet
+import aesara.tensor as at
 from aesara.ifelse import ifelse
 from aesara.scan.utils import until
 from aesara.tensor.random.utils import RandomStream
@@ -206,7 +206,7 @@ def dynamic_integration(
             0,
         )
 
-        steps = aet.arange(1, 1 + max_num_steps)
+        steps = at.arange(1, 1 + max_num_steps)
         traj, updates = aesara.scan(
             add_one_state,
             outputs_info=(
@@ -354,7 +354,7 @@ def multiplicative_expansion(
             )
 
             do_go_right = srng.bernoulli(0.5)
-            direction = aet.where(do_go_right, 1.0, -1.0)
+            direction = at.where(do_go_right, 1.0, -1.0)
             start_state = where_state(do_go_right, right_state, left_state)
 
             (
@@ -393,7 +393,7 @@ def multiplicative_expansion(
             # divergence occurs we reject this subtree's proposal. We
             # nevertheless update the sum of the logarithm of the acceptance
             # probabilities to serve as an estimate for dual averaging.
-            updated_weight = aet.logaddexp(proposal[2], new_proposal[2])
+            updated_weight = at.logaddexp(proposal[2], new_proposal[2])
             updated_proposal = (
                 proposal[0],
                 proposal[1],
@@ -429,7 +429,7 @@ def multiplicative_expansion(
                 is_turning,
             ), until(do_stop_expanding)
 
-        expansion_steps = aet.arange(0, max_num_expansions)
+        expansion_steps = at.arange(0, max_num_expansions)
         results, updates = aesara.scan(
             expand_once,
             outputs_info=(
@@ -467,7 +467,7 @@ def where_state(
 
     q = ifelse(do_pick_left, q_left, q_right)
     p = ifelse(do_pick_left, p_left, p_right)
-    potential_energy = aet.where(
+    potential_energy = at.where(
         do_pick_left, potential_energy_left, potential_energy_right
     )
     potential_energy_grad = ifelse(
@@ -487,8 +487,8 @@ def where_proposal(
     right_state, right_weight, right_energy, right_log_sum_p_accept = right_proposal
 
     state = where_state(do_pick_left, left_state, right_state)
-    energy = aet.where(do_pick_left, left_energy, right_energy)
-    weight = aet.where(do_pick_left, left_weight, right_weight)
+    energy = at.where(do_pick_left, left_energy, right_energy)
+    weight = at.where(do_pick_left, left_weight, right_weight)
     log_sum_p_accept = ifelse(
         do_pick_left, left_log_sum_p_accept, right_log_sum_p_accept
     )
