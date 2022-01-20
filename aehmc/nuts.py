@@ -98,7 +98,7 @@ def kernel(
             at.as_tensor(0.0, dtype="float64"),
             at.as_tensor(-np.inf, dtype="float64"),
         )
-        result, updates = expand(
+        result, _ = expand(
             initial_proposal,
             initial_state,
             initial_state,
@@ -107,8 +107,6 @@ def kernel(
             initial_energy,
             step_size,
         )
-        for key, value in updates.items():
-            key.default_update = value
 
         # New MCMC proposal
         q_new = result[0][-1]
@@ -129,6 +127,6 @@ def kernel(
             num_steps,
             is_turning,
             is_diverging,
-        ), updates
+        )
 
     return step
