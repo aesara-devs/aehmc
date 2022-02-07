@@ -190,7 +190,7 @@ def dynamic_integration(
                 *new_state,
                 new_momentum_sum,
                 *new_termination_state,
-                step,
+                step + 1,
                 is_diverging,
                 has_terminated,
             ), until(do_stop_integrating)
@@ -233,7 +233,7 @@ def dynamic_integration(
         new_state = (traj[7][-1], traj[8][-1], traj[9][-1], traj[10][-1])
         subtree_momentum_sum = traj[11][-1]
         new_termination_state = (traj[12][-1], traj[13][-1], traj[14][-1], traj[15][-1])
-        num_steps = 1 + traj[-3][-1]
+        num_steps = traj[-3][-1]
         is_diverging = traj[-2][-1] | is_diverging
         has_terminated = traj[-1][-1]
 
