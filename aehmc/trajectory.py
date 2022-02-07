@@ -387,7 +387,7 @@ def multiplicative_expansion(
             # Compute the pseudo-acceptance probability for the NUTS algorithm.
             # It can be understood as the average acceptance probability MC would give to
             # the states explored during the final expansion.
-            acceptance_probability = new_proposal[3] / subtrajectory_length
+            acceptance_probability = at.exp(new_proposal[3]) / subtrajectory_length
 
             # Update the proposal.
             # If the termination criterion is reached in the subtree or if a
