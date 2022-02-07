@@ -148,6 +148,7 @@ def dynamic_integration(
             momentum_sum_ckpts,
             idx_min,
             idx_max,
+            trajectory_length,
         ):
             state = (
                 q_last,
@@ -190,7 +191,7 @@ def dynamic_integration(
                 *new_state,
                 new_momentum_sum,
                 *new_termination_state,
-                step + 1,
+                trajectory_length + 1,
                 is_diverging,
                 has_terminated,
             ), until(do_stop_integrating)
@@ -217,7 +218,7 @@ def dynamic_integration(
                 *state,
                 momentum_sum,
                 *termination_state,
-                None,
+                at.as_tensor(1, dtype="int32"),
                 None,
                 None,
             ),
@@ -233,7 +234,7 @@ def dynamic_integration(
         new_state = (traj[7][-1], traj[8][-1], traj[9][-1], traj[10][-1])
         subtree_momentum_sum = traj[11][-1]
         new_termination_state = (traj[12][-1], traj[13][-1], traj[14][-1], traj[15][-1])
-        num_steps = traj[-3][-1]
+        trajectory_length = traj[-3][-1]  # defined as the number of steps taken
         is_diverging = traj[-2][-1] | is_diverging
         has_terminated = traj[-1][-1]
 
@@ -242,7 +243,7 @@ def dynamic_integration(
             new_state,
             subtree_momentum_sum,
             new_termination_state,
-            num_steps,
+            trajectory_length,
             is_diverging,
             has_terminated,
         ), updates
