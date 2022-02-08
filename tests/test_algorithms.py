@@ -95,4 +95,4 @@ def test_welford_scalar(do_compute_covariance):
         state = update(sample, *state)
 
     cov = final(state[1], state[2]).eval()
-    assert pytest.approx(cov.squeeze(), 55.0 / 6.0)
+    assert pytest.approx(cov.squeeze()) == 55.0 / 6.0
