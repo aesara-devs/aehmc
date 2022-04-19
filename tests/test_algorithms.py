@@ -85,7 +85,7 @@ def test_welford(n_dim, do_compute_covariance):
 
 @pytest.mark.parametrize("do_compute_covariance", [True, False])
 def test_welford_scalar(do_compute_covariance):
-    """"Test the Welford algorithm when the state is a scalar."""
+    """ "Test the Welford algorithm when the state is a scalar."""
     num_samples = 10
 
     init, update, final = algorithms.welford_covariance(do_compute_covariance)
