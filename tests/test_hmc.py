@@ -59,7 +59,7 @@ def test_hmc():
 
 def test_nuts():
     """Test the NUTS kernel on a gaussian target."""
-    step_size = 1.0
+    step_size = 0.1
     inverse_mass_matrix = at.as_tensor(1.0)
 
     srng = at.random.RandomStream(seed=0)
