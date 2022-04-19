@@ -370,7 +370,7 @@ def multiplicative_expansion(
                 start_state,
                 direction,
                 termination_state,
-                2 ** step,
+                2**step,
                 step_size,
                 initial_energy,
             )

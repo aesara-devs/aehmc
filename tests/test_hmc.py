@@ -116,7 +116,7 @@ def test_nuts_mcse(p_val=0.01):
     scale = np.array([1.0, 2.0])
     rho = np.array(0.75)
 
-    cov = np.diag(scale ** 2)
+    cov = np.diag(scale**2)
     cov[0, 1] = rho * scale[0] * scale[1]
     cov[1, 0] = rho * scale[0] * scale[1]
 
@@ -160,13 +160,13 @@ def test_nuts_mcse(p_val=0.01):
     posterior_samples = trajectory_generator(rng.standard_normal(2))[-1000:]
 
     posterior_delta = posterior_samples - loc
-    posterior_variance = posterior_delta ** 2
+    posterior_variance = posterior_delta**2
     posterior_correlation = np.prod(posterior_delta, axis=-1, keepdims=True) / (
         scale[0] * scale[1]
     )
 
     assert_mcse(posterior_samples, loc)
-    assert_mcse(posterior_variance, scale ** 2)
+    assert_mcse(posterior_variance, scale**2)
     assert_mcse(posterior_correlation, rho)
 
 
@@ -176,7 +176,7 @@ def test_hmc_mcse(p_val=0.01):
     scale = np.array([1.0, 2.0])
     rho = np.array(0.75)
 
-    cov = np.diag(scale ** 2)
+    cov = np.diag(scale**2)
     cov[0, 1] = rho * scale[0] * scale[1]
     cov[1, 0] = rho * scale[0] * scale[1]
 
@@ -213,11 +213,11 @@ def test_hmc_mcse(p_val=0.01):
     posterior_samples = trajectory_generator(rng.standard_normal(2))[-1000:]
 
     posterior_delta = posterior_samples - loc
-    posterior_variance = posterior_delta ** 2
+    posterior_variance = posterior_delta**2
     posterior_correlation = np.prod(posterior_delta, axis=-1, keepdims=True) / (
         scale[0] * scale[1]
     )
 
     assert_mcse(posterior_samples, loc)
-    assert_mcse(posterior_variance, scale ** 2)
+    assert_mcse(posterior_variance, scale**2)
     assert_mcse(posterior_correlation, rho)

@@ -139,7 +139,7 @@ def heuristic_adaptation(
         direction: TensorVariable,
         previous_direction: TensorVariable,
     ) -> Tuple[Tuple[TensorVariable, TensorVariable, TensorVariable], until]:
-        step_size = (2.0 ** direction) * step_size
+        step_size = (2.0**direction) * step_size
         *_, p_accept = kernel(*reference_state, step_size)
         new_direction = at.where(
             at.lt(target_acceptance_rate, p_accept), at.constant(1), at.constant(-1)
