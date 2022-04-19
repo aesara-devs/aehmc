@@ -374,8 +374,6 @@ def multiplicative_expansion(
                 step_size,
                 initial_energy,
             )
-            for key, value in inner_updates.items():
-                key.default_update = value
 
             # Update the trajectory.
             # The trajectory integrator always integrates forward in time; we
@@ -416,19 +414,23 @@ def multiplicative_expansion(
             do_stop_expanding = is_diverging | is_turning | has_subtree_terminated
 
             return (
-                *sampled_proposal[0],
-                sampled_proposal[1],
-                sampled_proposal[2],
-                sampled_proposal[3],
-                *new_left_state,
-                *new_right_state,
-                new_momentum_sum,
-                *new_termination_state,
-                acceptance_probability,
-                step + 1,
-                is_diverging,
-                is_turning,
-            ), until(do_stop_expanding)
+                (
+                    *sampled_proposal[0],
+                    sampled_proposal[1],
+                    sampled_proposal[2],
+                    sampled_proposal[3],
+                    *new_left_state,
+                    *new_right_state,
+                    new_momentum_sum,
+                    *new_termination_state,
+                    acceptance_probability,
+                    step + 1,
+                    is_diverging,
+                    is_turning,
+                ),
+                inner_updates,
+                until(do_stop_expanding),
+            )
 
         expansion_steps = at.arange(0, max_num_expansions)
         results, updates = aesara.scan(
@@ -449,8 +451,6 @@ def multiplicative_expansion(
             ),
             sequences=expansion_steps,
         )
-        for key, value in updates.items():
-            key.default_update = value
 
         return results, updates
 
