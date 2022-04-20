@@ -45,13 +45,9 @@ class RaveledParamsMap:
 
         param_sizes = [at.prod(s) for s in self.ref_shapes]
         cumsum_sizes = at.cumsum(param_sizes)
-        self.slice_indices = list(
-            zip(
-                [0] + param_sizes[:-1],
-                # `at.cumsum` doesn't return a tensor of a fixed/known size
-                [cumsum_sizes[i] for i in range(len(param_sizes))],
-            )
-        )
+        # `at.cumsum` doesn't return a tensor of a fixed/known size
+        cumsum_sizes = [cumsum_sizes[i] for i in range(len(param_sizes))]
+        self.slice_indices = list(zip([0] + cumsum_sizes[:-1], cumsum_sizes))
         self.vec_slices = [slice(*idx) for idx in self.slice_indices]
 
     def ravel_params(self, params: List[TensorVariable]) -> TensorVariable:
