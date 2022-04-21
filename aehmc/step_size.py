@@ -1,4 +1,4 @@
-from typing import Callable, Tuple
+from typing import Callable, Dict, Tuple
 
 import aesara
 import aesara.tensor as at
@@ -138,14 +138,16 @@ def heuristic_adaptation(
         step_size: TensorVariable,
         direction: TensorVariable,
         previous_direction: TensorVariable,
-    ) -> Tuple[Tuple[TensorVariable, TensorVariable, TensorVariable], until]:
+    ) -> Tuple[Tuple[TensorVariable, TensorVariable, TensorVariable], Dict, until]:
         step_size = (2.0**direction) * step_size
-        *_, p_accept = kernel(*reference_state, step_size)
+        (*_, p_accept), inner_updates = kernel(*reference_state, step_size)
         new_direction = at.where(
             at.lt(target_acceptance_rate, p_accept), at.constant(1), at.constant(-1)
         )
-        return (step_size.astype("floatX"), new_direction, direction), until(
-            at.neq(direction, previous_direction)
+        return (
+            (step_size.astype("floatX"), new_direction, direction),
+            inner_updates,
+            until(at.neq(direction, previous_direction)),
         )
 
     (step_sizes, _, _), _ = aesara.scan(

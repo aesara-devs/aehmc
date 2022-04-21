@@ -48,9 +48,11 @@ def test_dual_averaging_adaptation(init):
     step, logstepsize_avg, gradient_avg = init(at.as_tensor(0.0, dtype="floatX"))
 
     def one_step(q, logprob, logprob_grad, step, x_t, x_avg, gradient_avg):
-        *state, p_accept = kernel(q, logprob, logprob_grad, at.exp(x_t))
+        (*state, p_accept), inner_updates = kernel(
+            q, logprob, logprob_grad, at.exp(x_t)
+        )
         da_state = update(p_accept, step, x_t, x_avg, gradient_avg)
-        return (*state, *da_state, p_accept)
+        return (*state, *da_state, p_accept), inner_updates
 
     states, updates = aesara.scan(
         fn=one_step,

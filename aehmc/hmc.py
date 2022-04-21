@@ -1,4 +1,4 @@
-from typing import Callable, Tuple
+from typing import Callable, Dict, Tuple
 
 import aesara
 import aesara.tensor as at
@@ -68,7 +68,7 @@ def kernel(
         potential_energy: TensorVariable,
         potential_energy_grad: TensorVariable,
         step_size: TensorVariable,
-    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable, bool]:
+    ) -> Tuple[Tuple[TensorVariable, TensorVariable, TensorVariable, bool], Dict]:
         """Perform a single step of the HMC algorithm.
 
         Parameters
@@ -84,10 +84,15 @@ def kernel(
             potential_energy_new,
             potential_energy_grad_new,
             p_accept,
-        ) = proposal_generator(
+        ), updates = proposal_generator(
             srng, q, p, potential_energy, potential_energy_grad, step_size
         )
-        return q_new, potential_energy_new, potential_energy_grad_new, p_accept
+        return (
+            q_new,
+            potential_energy_new,
+            potential_energy_grad_new,
+            p_accept,
+        ), updates
 
     return step
 
@@ -110,13 +115,23 @@ def hmc_proposal(
         potential_energy_grad: TensorVariable,
         step_size: TensorVariable,
     ) -> Tuple[
-        TensorVariable, TensorVariable, TensorVariable, TensorVariable, TensorVariable
+        Tuple[
+            TensorVariable,
+            TensorVariable,
+            TensorVariable,
+            TensorVariable,
+            TensorVariable,
+        ],
+        Dict,
     ]:
         """Use the HMC algorithm to propose a new state."""
 
-        new_q, new_p, new_potential_energy, new_potential_energy_grad = integrate(
-            q, p, potential_energy, potential_energy_grad, step_size
-        )
+        (
+            new_q,
+            new_p,
+            new_potential_energy,
+            new_potential_energy_grad,
+        ), updates = integrate(q, p, potential_energy, potential_energy_grad, step_size)
 
         # flip the momentum to keep detailed balance
         flipped_p = -1.0 * new_p
@@ -147,6 +162,6 @@ def hmc_proposal(
             final_potential_energy,
             final_potential_energy_grad,
             p_accept,
-        )
+        ), updates
 
     return propose

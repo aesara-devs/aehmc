@@ -58,8 +58,8 @@ def test_static_integration(example):
     p = at.vector("p")
     energy = potential(q)
     energy_grad = aesara.grad(energy, q)
-    final_state = integrator(q, p, energy, energy_grad, step_size)
-    integrate_fn = aesara.function((q, p), final_state)
+    final_state, updates = integrator(q, p, energy, energy_grad, step_size)
+    integrate_fn = aesara.function((q, p), final_state, updates=updates)
 
     q_final, p_final, *_ = integrate_fn(q_init, p_init)
 
