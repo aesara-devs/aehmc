@@ -98,7 +98,7 @@ def kernel(
             at.as_tensor(0.0, dtype="float64"),
             at.as_tensor(-np.inf, dtype="float64"),
         )
-        result, _ = expand(
+        result, updates = expand(
             initial_proposal,
             initial_state,
             initial_state,
@@ -127,6 +127,6 @@ def kernel(
             num_doublings,
             is_turning,
             is_diverging,
-        )
+        ), updates
 
     return step

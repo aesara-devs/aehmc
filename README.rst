@@ -12,35 +12,48 @@ Example
 
 .. code-block:: python
 
-        import aesara
-        from aesara import tensor as at
-        from aesara.tensor.random.utils import RandomStream
+    import aesara
+    from aesara import tensor as at
+    from aesara.tensor.random.utils import RandomStream
 
-        from aeppl import joint_logprob
+    from aeppl import joint_logprob
 
-        from aehmc import nuts
+    from aehmc import nuts
 
-        # A simple normal distribution
-        Y_rv = at.random.normal(0, 1)
+    # A simple normal distribution
+    Y_rv = at.random.normal(0, 1)
 
-        def logprob_fn(y):
-          logprob = joint_logprob({Y_rv: y})
-          return logprob
 
-        # Build the transition kernel
-        srng = RandomStream(seed=0)
-        kernel = nuts.kernel(
-            srng,
-            logprob_fn,
-            inverse_mass_matrix=at.as_tensor(1.),
-        )
+    def logprob_fn(y):
+        return joint_logprob({Y_rv: y})
 
-        # Compile a function that updates the chain
-        y_vv = Y_rv.clone()
-        initial_state = nuts.new_state(y_vv, logprob_fn)
 
-        next_step = kernel(*initial_state, 1e-2)
-        print(next_step[0][1].eval({y_vv: 0}))
+    # Build the transition kernel
+    srng = RandomStream(seed=0)
+    kernel = nuts.kernel(
+        srng,
+        logprob_fn,
+        inverse_mass_matrix=at.as_tensor(1.0),
+    )
+
+    # Compile a function that updates the chain
+    y_vv = Y_rv.clone()
+    initial_state = nuts.new_state(y_vv, logprob_fn)
+
+    (
+        next_step,
+        potential_energy,
+        potential_energy_grad,
+        acceptance_prob,
+        num_doublings,
+        is_turning,
+        is_diverging,
+    ), updates = kernel(*initial_state, 1e-2)
+
+    next_step_fn = aesara.function([y_vv], next_step, updates=updates)
+
+    print(next_step_fn(0))
+    # 0.14344008534533775
 
 
 Installation

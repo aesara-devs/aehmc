@@ -1,4 +1,4 @@
-from typing import Callable, Tuple
+from typing import Callable, Dict, Tuple
 
 import aesara
 import aesara.tensor as at
@@ -38,14 +38,14 @@ def static_integration(
 
     def integrate(
         q_init, p_init, energy_init, energy_grad_init, step_size
-    ) -> IntegratorStateType:
+    ) -> Tuple[IntegratorStateType, Dict]:
         def one_step(q, p, potential_energy, potential_energy_grad):
             new_state = integrator(
                 q, p, potential_energy, potential_energy_grad, step_size
             )
             return new_state
 
-        [q, p, energy, energy_grad], _ = aesara.scan(
+        [q, p, energy, energy_grad], updates = aesara.scan(
             fn=one_step,
             outputs_info=[
                 {"initial": q_init},
@@ -56,7 +56,7 @@ def static_integration(
             n_steps=num_integration_steps,
         )
 
-        return q[-1], p[-1], energy[-1], energy_grad[-1]
+        return (q[-1], p[-1], energy[-1], energy_grad[-1]), updates
 
     return integrate
 
