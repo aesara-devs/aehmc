@@ -5,8 +5,8 @@ import pytest
 from aesara import config
 from aesara.tensor.random.utils import RandomStream
 
-from aehmc import hmc
-from aehmc.step_size import dual_averaging_adaptation, heuristic_adaptation
+from aehmc import hmc, nuts
+from aehmc.step_size import dual_averaging_adaptation
 
 
 @pytest.fixture()
@@ -24,36 +24,18 @@ def init():
     return initial_state, kernel
 
 
-def test_heuristic_adaptation(init):
-    reference_state, kernel = init
-
-    epsilon_1 = heuristic_adaptation(
-        kernel, reference_state, at.as_tensor(0.5, dtype=config.floatX), 0.95
-    )
-    epsilon_1_val = epsilon_1.eval()
-    assert epsilon_1_val != np.inf
-
-    epsilon_2 = heuristic_adaptation(
-        kernel, reference_state, at.as_tensor(0.5, dtype=config.floatX), 0.05
-    )
-    epsilon_2_val = epsilon_2.eval()
-    assert epsilon_2_val > epsilon_1_val
-    assert epsilon_2_val != np.inf
-
-
 def test_dual_averaging_adaptation(init):
     initial_state, kernel = init
 
-    stepsize = at.as_tensor(1.0, dtype=config.floatX)
-    logpstepsize = at.log(stepsize)
-    init, update = dual_averaging_adaptation()
-    step, logstepsize_avg, gradient_avg, mu = init(stepsize)
+    init_stepsize = at.as_tensor(1.0, dtype=config.floatX)
+    init_fn, update_fn = dual_averaging_adaptation()
+    step, logstepsize, logstepsize_avg, gradient_avg, mu = init_fn(init_stepsize)
 
     def one_step(q, logprob, logprob_grad, step, x_t, x_avg, gradient_avg):
         (*state, p_accept), inner_updates = kernel(
             q, logprob, logprob_grad, at.exp(x_t)
         )
-        da_state = update(p_accept, step, x_t, x_avg, gradient_avg)
+        da_state = update_fn(p_accept, step, x_t, x_avg, gradient_avg, mu)
         return (*state, *da_state, p_accept), inner_updates
 
     states, updates = aesara.scan(
