@@ -16,8 +16,8 @@ def run(
     num_steps=1000,
     *,
     is_mass_matrix_full=False,
-    initial_step_size=at.as_tensor(0.5, dtype=config.floatX),
-    target_acceptance_rate=0.65
+    initial_step_size=at.as_tensor(1.0, dtype=config.floatX),
+    target_acceptance_rate=0.80
 ):
     init, update, final = window_adaptation(
         kernel_factory, is_mass_matrix_full, initial_step_size, target_acceptance_rate
@@ -76,7 +76,7 @@ def window_adaptation(
     kernel_factory: Callable[[TensorVariable], Callable],
     is_mass_matrix_full: bool = False,
     initial_step_size: TensorVariable = at.as_tensor(1.0, dtype=config.floatX),
-    target_acceptance_rate: TensorVariable = 0.65,
+    target_acceptance_rate: TensorVariable = 0.80,
 ):
     mm_init, mm_update, mm_final = covariance_adaptation(is_mass_matrix_full)
     da_init, da_update = dual_averaging_adaptation(target_acceptance_rate)

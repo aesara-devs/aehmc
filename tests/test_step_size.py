@@ -54,7 +54,7 @@ def test_dual_averaging_adaptation(init):
     )
 
     p_accept = aesara.function((), states[-1], updates=updates)
-    step_size = aesara.function((), at.exp(states[-3][-1]), updates=updates)
-    assert np.mean(p_accept()) == pytest.approx(0.65, rel=10e-3)
+    step_size = aesara.function((), at.exp(states[-4][-1]), updates=updates)
+    assert np.mean(p_accept()) == pytest.approx(0.8, rel=10e-3)
     assert step_size() < 10
     assert step_size() > 1e-1
