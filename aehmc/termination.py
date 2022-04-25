@@ -106,51 +106,6 @@ def iterative_uturn(is_turning_fn: Callable):
 
         return (momentum_ckpt, momentum_sum_ckpt, idx_min, idx_max)
 
-    def _find_storage_indices(step: TensorVariable):
-        """Find the indices between which the momenta and sums are stored.
-
-        Parameter
-        ---------
-        step
-            The current step in the trajectory integration.
-
-        Return
-        ------
-        The min and max indices between which the values relevant to check the
-        U-turn condition for the current step are stored.
-
-        """
-
-        def count_subtrees(nc0, nc1):
-            do_stop = at.eq(nc0 & 1, 0)
-            new_nc0 = nc0 // 2
-            new_nc1 = nc1 + 1
-            return (new_nc0, new_nc1), until(do_stop)
-
-        (_, nc1), _ = aesara.scan(
-            count_subtrees,
-            outputs_info=(step, -1),
-            n_steps=step + 1,
-        )
-        num_subtrees = nc1[-1]
-
-        def find_idx_max(nc0, nc1):
-            do_stop = at.eq(nc0, 0)
-            new_nc0 = nc0 // 2
-            new_nc1 = nc1 + (nc0 & 1)
-            return (new_nc0, new_nc1), until(do_stop)
-
-        init = at.as_tensor(step // 2).astype(np.int32)
-        init_nc1 = at.constant(0).astype(np.int32)
-        (nc0, nc1), _ = aesara.scan(
-            find_idx_max, outputs_info=(init, init_nc1), n_steps=step + 1
-        )
-        idx_max = nc1[-1]
-
-        idx_min = idx_max - num_subtrees + 1
-
-        return idx_min, idx_max
-
     def is_iterative_turning(
         state: Tuple, momentum_sum: TensorVariable, momentum: TensorVariable
     ):
@@ -204,3 +159,49 @@ def iterative_uturn(is_turning_fn: Callable):
         return is_turning
 
     return new_state, update, is_iterative_turning
+
+
+def _find_storage_indices(step: TensorVariable):
+    """Find the indices between which the momenta and sums are stored.
+
+    Parameter
+    ---------
+    step
+        The current step in the trajectory integration.
+
+    Return
+    ------
+    The min and max indices between which the values relevant to check the
+    U-turn condition for the current step are stored.
+
+    """
+
+    def count_subtrees(nc0, nc1):
+        do_stop = at.eq(nc0 & 1, 0)
+        new_nc0 = nc0 // 2
+        new_nc1 = nc1 + 1
+        return (new_nc0, new_nc1), until(do_stop)
+
+    (_, nc1), _ = aesara.scan(
+        count_subtrees,
+        outputs_info=(step, -1),
+        n_steps=step + 1,
+    )
+    num_subtrees = nc1[-1]
+
+    def find_idx_max(nc0, nc1):
+        do_stop = at.eq(nc0, 0)
+        new_nc0 = nc0 // 2
+        new_nc1 = nc1 + (nc0 & 1)
+        return (new_nc0, new_nc1), until(do_stop)
+
+    init = at.as_tensor(step // 2).astype(np.int32)
+    init_nc1 = at.constant(0).astype(np.int32)
+    (nc0, nc1), _ = aesara.scan(
+        find_idx_max, outputs_info=(init, init_nc1), n_steps=step + 1
+    )
+    idx_max = nc1[-1]
+
+    idx_min = idx_max - num_subtrees + 1
+
+    return idx_min, idx_max

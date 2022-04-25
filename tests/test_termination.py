@@ -6,7 +6,7 @@ import pytest
 from numpy.testing import assert_array_equal
 
 from aehmc.metrics import gaussian_metric
-from aehmc.termination import iterative_uturn
+from aehmc.termination import _find_storage_indices, iterative_uturn
 
 
 @pytest.mark.parametrize(
@@ -41,6 +41,20 @@ def test_iterative_turning_termination(
 
     assert actual_turning.ndim == 0
     assert expected_turning == actual_turning
+
+
+@pytest.mark.parametrize(
+    "step, expected_idx",
+    [(0, (1, 0)), (6, (3, 2)), (7, (0, 2)), (13, (2, 2)), (15, (0, 3))],
+)
+def test_leaf_idx_to_ckpt_idx(step, expected_idx):
+    step_tt = at.scalar("step", dtype="int32")
+    idx_tt = _find_storage_indices(step_tt)
+    fn = aesara.function((step_tt,), (*idx_tt,))
+
+    idx_vv = fn(step)
+    assert idx_vv[0].item() == expected_idx[0]
+    assert idx_vv[1].item() == expected_idx[1]
 
 
 @pytest.mark.parametrize(
