@@ -1,9 +1,6 @@
-from typing import Callable, Dict, Tuple
+from typing import Callable, Tuple
 
-import aesara
 import aesara.tensor as at
-from aesara import config
-from aesara.scan.utils import until
 from aesara.tensor.var import TensorVariable
 
 from aehmc import algorithms
@@ -89,85 +86,3 @@ def dual_averaging_adaptation(
         return da_update(gradient, step, log_step_size, log_step_size_avg, gradient_avg)
 
     return da_init, update
-
-
-def heuristic_adaptation(
-    kernel: Callable,
-    reference_state: Tuple,
-    initial_step_size: TensorVariable,
-    target_acceptance_rate=0.65,
-    max_num_iterations=100,
-) -> TensorVariable:
-    """Find a reasonable initial step size during warmup.
-
-    While the dual averaging scheme is guaranteed to converge to a reasonable
-    value for the step size starting from any value, choosing a good first
-    value can speed up the convergence. This heuristics doubles and halves the
-    step size until the acceptance probability of the HMC proposal crosses the
-    target value.
-
-    Parameters
-    ----------
-    kernel
-        A function that takes a state, a step size and returns a new state.
-    reference_hmc_state
-        The location (HMC state) where this first step size must be found. This function
-        never advances the chain.
-    inverse_mass_matrix
-        The inverse mass matrix relative to which the step size must be found.
-    initial_step_size
-        The first step size used to start the search.
-    target_acceptance_rate
-        Once that value of the metropolis acceptance probability is reached we
-        estimate that we have found a "reasonable" first step size.
-    max_num_iterations
-        The maximum number of times we iterate on the algorithm.
-
-    Returns
-    -------
-    float
-        A reasonable first value for the step size.
-
-    Reference
-    ---------
-    .. [1]: Hoffman, Matthew D., and Andrew Gelman. "The No-U-Turn sampler:
-            adaptively setting path lengths in Hamiltonian Monte Carlo." Journal
-            of Machine Learning Research 15.1 (2014): 1593-1623.
-    """
-
-    def update(
-        step_size: TensorVariable,
-        direction: TensorVariable,
-        previous_direction: TensorVariable,
-    ) -> Tuple[Tuple[TensorVariable, TensorVariable, TensorVariable], Dict, until]:
-        step_size = (2.0**direction) * step_size
-        (*_, p_accept), inner_updates = kernel(*reference_state, step_size)
-        new_direction = at.where(
-            at.lt(target_acceptance_rate, p_accept), at.constant(1), at.constant(-1)
-        )
-        return (
-            (step_size.astype("floatX"), new_direction, direction),
-            inner_updates,
-            until(at.neq(direction, previous_direction)),
-        )
-
-        is_not_first_step = at.neq(previous_direction, at.constant(0))
-        has_crossed_threshold = at.neq(direction, previous_direction)
-        stop_iterating = is_not_first_step & has_crossed_threshold
-
-        return (
-            (step_size.astype(config.floatX), new_direction, direction),
-            until(stop_iterating),
-        )
-
-    (step_sizes, _, _), updates = aesara.scan(
-        fn=update,
-        outputs_info=[
-            {"initial": initial_step_size},
-            {"initial": at.constant(0)},
-            {"initial": at.constant(0)},
-        ],
-        n_steps=max_num_iterations,
-    )
-
-    return step_sizes[-1]

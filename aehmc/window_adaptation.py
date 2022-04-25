@@ -7,7 +7,7 @@ from aesara.tensor.shape import shape_tuple
 from aesara.tensor.var import TensorVariable
 
 from aehmc.mass_matrix import covariance_adaptation
-from aehmc.step_size import dual_averaging_adaptation, heuristic_adaptation
+from aehmc.step_size import dual_averaging_adaptation
 
 
 def run(
