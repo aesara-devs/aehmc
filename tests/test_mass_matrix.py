@@ -40,7 +40,7 @@ def test_mass_matrix_adaptation(is_full_matrix, n_dims):
             {"initial": wc_state[1]},
             {"initial": wc_state[2]},
         ],
-        n_steps=1_000,
+        n_steps=2_000,
     )
 
     inverse_mass_matrix = final((results[0][-1], results[1][-1], results[2][-1]))
