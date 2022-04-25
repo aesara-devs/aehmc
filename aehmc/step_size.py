@@ -8,7 +8,7 @@ from aehmc import algorithms
 
 def dual_averaging_adaptation(
     initial_log_step_size: TensorVariable,
-    target_acceptance_rate: TensorVariable = at.as_tensor(0.65),
+    target_acceptance_rate: TensorVariable = at.as_tensor(0.8),
     gamma: float = 0.05,
     t0: int = 10,
     kappa: float = 0.75,
