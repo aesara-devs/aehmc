@@ -15,15 +15,13 @@ def test_dual_averaging():
 
     init, update = algorithms.dual_averaging(gamma=0.5)
 
-    def one_step(step, x, x_avg, gradient_avg):
+    def one_step(step, x, x_avg, gradient_avg, mu):
         value = fn(x)
         gradient = aesara.grad(value, x)
-        return update(gradient, step, x, x_avg, gradient_avg)
+        return update(gradient, step, x, x_avg, gradient_avg, mu)
 
-    x_init = at.as_tensor(0, dtype=config.floatX)
-
-    mu = at.as_tensor(0.5, dtype=config.floatX)
-    step, x_avg, gradient_avg, mu = init(mu)
+    mu = at.as_tensor(at.constant(0.5), dtype=config.floatX)
+    step, x_init, x_avg, gradient_avg, mu = init(mu)
 
     states, updates = aesara.scan(
         fn=one_step,
@@ -32,12 +30,15 @@ def test_dual_averaging():
             {"initial": x_init},
             {"initial": x_avg},
             {"initial": gradient_avg},
+            {"initial": mu},
         ],
         n_steps=100,
     )
 
-    last_x_avg = states[1].eval()[-1]
+    last_x = states[1].eval()[-1]
+    last_x_avg = states[2].eval()[-1]
     assert last_x_avg == pytest.approx(1.0, 1e-2)
+    assert last_x == pytest.approx(1.0, 1e-2)
 
 
 @pytest.mark.parametrize("n_dim", [1, 3])

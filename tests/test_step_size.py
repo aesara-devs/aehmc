@@ -5,7 +5,7 @@ import pytest
 from aesara import config
 from aesara.tensor.random.utils import RandomStream
 
-from aehmc import hmc, nuts
+from aehmc import hmc
 from aehmc.step_size import dual_averaging_adaptation
 
 
@@ -19,7 +19,7 @@ def init():
     kernel = hmc.kernel(srng, logprob_fn, inverse_mass_matrix, 10)
 
     initial_position = at.as_tensor(1.0, dtype=config.floatX)
-    initial_state = nuts.new_state(initial_position, logprob_fn)
+    initial_state = hmc.new_state(initial_position, logprob_fn)
 
     return initial_state, kernel
 
@@ -31,7 +31,7 @@ def test_dual_averaging_adaptation(init):
     init_fn, update_fn = dual_averaging_adaptation()
     step, logstepsize, logstepsize_avg, gradient_avg, mu = init_fn(init_stepsize)
 
-    def one_step(q, logprob, logprob_grad, step, x_t, x_avg, gradient_avg):
+    def one_step(q, logprob, logprob_grad, step, x_t, x_avg, gradient_avg, mu):
         (*state, p_accept), inner_updates = kernel(
             q, logprob, logprob_grad, at.exp(x_t)
         )
@@ -45,9 +45,10 @@ def test_dual_averaging_adaptation(init):
             {"initial": initial_state[1]},
             {"initial": initial_state[2]},
             {"initial": step},
-            {"initial": logpstepsize},
+            {"initial": logstepsize},
             {"initial": logstepsize_avg},
             {"initial": gradient_avg},
+            {"initial": mu},
             None,
         ],
         n_steps=10_000,
