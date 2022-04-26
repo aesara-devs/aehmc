@@ -7,7 +7,6 @@ from aehmc import algorithms
 
 
 def dual_averaging_adaptation(
-    initial_log_step_size: TensorVariable,
     target_acceptance_rate: TensorVariable = at.as_tensor(0.8),
     gamma: float = 0.05,
     t0: int = 10,
@@ -71,9 +70,7 @@ def dual_averaging_adaptation(
             adaptively setting path lengths in Hamiltonian Monte Carlo." Journal
             of Machine Learning Research 15.1 (2014): 1593-1623.
     """
-
-    mu = at.log(10) + initial_log_step_size
-    da_init, da_update = algorithms.dual_averaging(mu, gamma, t0, kappa)
+    da_init, da_update = algorithms.dual_averaging(gamma, t0, kappa)
 
     def update(
         acceptance_probability: TensorVariable,
@@ -81,8 +78,11 @@ def dual_averaging_adaptation(
         log_step_size: TensorVariable,
         log_step_size_avg: TensorVariable,
         gradient_avg: TensorVariable,
+        mu: TensorVariable,
     ) -> Tuple[TensorVariable, TensorVariable, TensorVariable, TensorVariable]:
         gradient = target_acceptance_rate - acceptance_probability
-        return da_update(gradient, step, log_step_size, log_step_size_avg, gradient_avg)
+        return da_update(
+            gradient, step, log_step_size, log_step_size_avg, gradient_avg, mu
+        )
 
     return da_init, update

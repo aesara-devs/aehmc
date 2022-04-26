@@ -7,7 +7,7 @@ from aesara.tensor.var import TensorVariable
 
 
 def dual_averaging(
-    mu: float = 0.5, gamma: float = 0.05, t0: int = 10, kappa: float = 0.75
+    gamma: float = 0.05, t0: int = 10, kappa: float = 0.75
 ) -> Tuple[Callable, Callable]:
     """Dual averaging algorithm.
 
@@ -23,8 +23,6 @@ def dual_averaging(
 
     Parameters
     ----------
-    mu
-        Chosen points towards which the successive iterates are shrunk.
     gamma
         Controls the amount of shrinkage towards mu.
     t0
@@ -49,11 +47,21 @@ def dual_averaging(
 
     def init(
         mu: TensorVariable,
-    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable, TensorVariable]:
+    ) -> Tuple[
+        TensorVariable, TensorVariable, TensorVariable, TensorVariable, TensorVariable
+    ]:
+        """
+        Parameters
+        ----------
+        mu
+            Chosen points towards which the successive iterates are shrunk.
+
+        """
         step = at.as_tensor(1, "step", dtype=np.int32)
-        gradient_avg = at.as_tensor(0, "gradient_avg", dtype=mu.dtype)
-        x_avg = at.as_tensor(0.0, "x_avg", dtype=mu.dtype)
-        return step, x_avg, gradient_avg, mu
+        gradient_avg = at.as_tensor(0, "gradient_avg", dtype=config.floatX)
+        x_t = at.as_tensor(0.0, "x_t", dtype=config.floatX)
+        x_avg = at.as_tensor(0.0, "x_avg", dtype=config.floatX)
+        return step, x_t, x_avg, gradient_avg, mu
 
     def update(
         gradient: TensorVariable,
@@ -61,7 +69,10 @@ def dual_averaging(
         x: TensorVariable,
         x_avg: TensorVariable,
         gradient_avg: TensorVariable,
-    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable, TensorVariable]:
+        mu: TensorVariable,
+    ) -> Tuple[
+        TensorVariable, TensorVariable, TensorVariable, TensorVariable, TensorVariable
+    ]:
         """Update the state of the Dual Averaging algorithm.
 
         Parameters
