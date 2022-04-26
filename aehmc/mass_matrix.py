@@ -1,6 +1,7 @@
 from typing import Callable, Tuple
 
 import aesara.tensor as at
+from aesara import config
 from aesara.tensor.var import TensorVariable
 
 from aehmc import algorithms
@@ -45,10 +46,12 @@ def covariance_adaptation(
             the number of dimensions of the chain position.
 
         """
-        if is_mass_matrix_full:
-            inverse_mass_matrix = at.eye(n_dims)
+        if n_dims == 0:
+            inverse_mass_matrix = at.constant(1.0, dtype=config.floatX)
+        elif is_mass_matrix_full:
+            inverse_mass_matrix = at.eye(n_dims, dtype=config.floatX)
         else:
-            inverse_mass_matrix = at.ones(n_dims)
+            inverse_mass_matrix = at.ones((n_dims,), dtype=config.floatX)
 
         wc_state = wc_init(n_dims)
 
@@ -90,10 +93,13 @@ def covariance_adaptation(
 
         scaled_covariance = (sample_size / (sample_size + 5)) * covariance
         shrinkage = 1e-3 * (5 / (sample_size + 5))
-        if is_mass_matrix_full:
-            new_inverse_mass_matrix = scaled_covariance + shrinkage * at.identity_like(
-                covariance
-            )
+        if covariance.ndim > 0:
+            if is_mass_matrix_full:
+                new_inverse_mass_matrix = (
+                    scaled_covariance + shrinkage * at.identity_like(covariance)
+                )
+            else:
+                new_inverse_mass_matrix = scaled_covariance + shrinkage
         else:
             new_inverse_mass_matrix = scaled_covariance + shrinkage
 

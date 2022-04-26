@@ -149,8 +149,8 @@ def welford_covariance(compute_covariance: bool) -> Tuple[Callable, Callable, Ca
 
         if n_dims == 0:
             return (
-                at.as_tensor(0, dtype=config.floatX),
-                at.as_tensor(0, dtype=config.floatX),
+                at.as_tensor(0.0, dtype=config.floatX),
+                at.as_tensor(0.0, dtype=config.floatX),
                 sample_size,
             )
 
@@ -159,6 +159,7 @@ def welford_covariance(compute_covariance: bool) -> Tuple[Callable, Callable, Ca
             m2 = at.zeros((n_dims, n_dims), dtype=config.floatX)
         else:
             m2 = at.zeros((n_dims,), dtype=config.floatX)
+
         return mean, m2, sample_size
 
     def update(
@@ -186,7 +187,7 @@ def welford_covariance(compute_covariance: bool) -> Tuple[Callable, Callable, Ca
         delta = value - mean
         mean = mean + delta / sample_size
         updated_delta = value - mean
-        if compute_covariance:
+        if compute_covariance and mean.ndim > 0:
             m2 = m2 + at.outer(updated_delta, delta)
         else:
             m2 = m2 + updated_delta * delta
