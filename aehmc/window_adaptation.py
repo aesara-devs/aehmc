@@ -19,6 +19,7 @@ def run(
     initial_step_size=at.as_tensor(1.0, dtype=config.floatX),
     target_acceptance_rate=0.80
 ):
+
     init, update, final = window_adaptation(
         kernel_factory, is_mass_matrix_full, initial_step_size, target_acceptance_rate
     )
@@ -40,37 +41,40 @@ def run(
         sample_size,
     ):
         chain_state = (q, potential_energy, potential_energy_grad)
+
         warmup_state = (
             (step, log_step_size, log_step_size_avg, gradient_avg, mu),
+            inverse_mass_matrix,
             (mean, m2, sample_size),
         )
 
-        chain_state, warmup_state, updates = update(
+        chain_state, warmup_state = update(
             stage, is_middle_window_end, chain_state, warmup_state
         )
 
-        return (*chain_state, *warmup_state[0], *warmup_state[1]), updates
+        return (*chain_state, *warmup_state[0], warmup_state[1], *warmup_state[2])
 
     schedule = build_schedule(num_steps)
     stage = at.as_tensor([s[0] for s in schedule])
     is_middle_window_end = at.as_tensor([s[1] for s in schedule])
 
-    da_state, mm_state = init(initial_state)
+    da_state, inverse_mass_matrix, wc_state = init(initial_state)
     state, updates = aesara.scan(
         fn=one_step,
-        outputs_info=(*initial_state, *da_state, *mm_state),
+        outputs_info=(*initial_state, *da_state, inverse_mass_matrix, *wc_state),
         sequences=(stage, is_middle_window_end),
     )
 
     last_chain_state = (state[0][-1], state[1][-1], state[2][-1])
     last_warmup_state = (
         (state[3][-1], state[4][-1], state[5][-1], state[6][-1], state[7][-1]),
-        (state[8][-1], state[9][-1], state[10][-1]),
+        state[8][-1],
+        (state[9][-1], state[10][-1], state[11][-1]),
     )
 
     step_size, inverse_mass_matrix = final(last_warmup_state)
 
-    return (last_chain_state, (step_size, inverse_mass_matrix)), updates
+    return last_chain_state, (step_size, inverse_mass_matrix), updates
 
 
 def window_adaptation(
@@ -110,26 +114,34 @@ def window_adaptation(
 
     def slow_final(warmup_state):
         """We recompute the inverse mass matrix and re-initialize the dual averaging scheme at the end of each 'slow window'."""
-        da_state, mm_state = warmup_state
-        mm_final(mm_state)
-        return ((step, da_state[2], logstepsize_avg, gradient_avg, mu), mm_state)
+        da_state, inverse_mass_matrix, mm_state = warmup_state
+
+        new_inverse_mass_matrix = mm_final(mm_state)
+        _, new_mm_state = mm_init(inverse_mass_matrix.ndim)
+
         step_size = at.exp(da_state[1])
         step, logstepsize, logstepsize_avg, gradient_avg, mu = da_init(step_size)
+        return (
+            (step, logstepsize, logstepsize_avg, gradient_avg, mu),
+            new_inverse_mass_matrix,
+            new_mm_state,
+        )
 
     def update(
         stage: int, is_middle_window_end: bool, chain_state: Tuple, warmup_state: Tuple
     ):
-        da_state, mm_state = warmup_state
-        step_size = at.exp(da_state[2])
-        inverse_mass_matrix = mm_final(mm_state)
+        da_state, inverse_mass_matrix, mm_state = warmup_state
 
+        step_size = at.exp(da_state[1])
         kernel = kernel_factory(inverse_mass_matrix)
-        (*chain_state, p_accept, _, _, _), updates = kernel(*chain_state, step_size)
+        *chain_state, p_accept, _, _, _ = kernel(*chain_state, step_size)
 
         warmup_state = where_warmup_state(
             at.eq(stage, 0),
-            fast_update(p_accept, da_state, mm_state),
-            slow_update(chain_state[0], p_accept, da_state, mm_state),
+            fast_update(p_accept, da_state, inverse_mass_matrix, mm_state),
+            slow_update(
+                chain_state[0], p_accept, da_state, inverse_mass_matrix, mm_state
+            ),
         )
         warmup_state = where_warmup_state(
             is_middle_window_end, slow_final(warmup_state), warmup_state
@@ -166,23 +178,27 @@ def window_adaptation(
         gradient_avg = at.where(do_pick_left, left_gradient_avg, right_gradient_avg)
         mu = at.where(do_pick_left, left_mu, right_mu)
 
-        right_mean, right_m2, right_sample_size = right_warmup_state[1]
-        left_mean, left_m2, left_sample_size = left_warmup_state[1]
+        left_inverse_mass_matrix = left_warmup_state[1]
+        right_inverse_mass_matrix = right_warmup_state[1]
+        inverse_mass_matrix = at.where(
+            do_pick_left, left_inverse_mass_matrix, right_inverse_mass_matrix
+        )
+
+        right_mean, right_m2, right_sample_size = right_warmup_state[2]
+        left_mean, left_m2, left_sample_size = left_warmup_state[2]
         mean = at.where(do_pick_left, left_mean, right_mean)
         m2 = at.where(do_pick_left, left_m2, right_m2)
         sample_size = at.where(do_pick_left, left_sample_size, right_sample_size)
 
-        return (step, logstepsize, logstepsize_avg, gradient_avg, mu), (
-            mean,
-            m2,
-            sample_size,
+        return (
+            (step, logstepsize, logstepsize_avg, gradient_avg, mu),
+            inverse_mass_matrix,
+            (
+                mean,
+                m2,
+                sample_size,
+            ),
         )
-
-    def final(warmup_state: Tuple) -> Tuple[TensorVariable, TensorVariable]:
-        da_state, mm_state = warmup_state
-        step_size = at.exp(da_state[3])
-        inverse_mass_matrix = mm_final(mm_state)
-        return step_size, inverse_mass_matrix
 
     return init, update, final
 

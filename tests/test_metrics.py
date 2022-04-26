@@ -8,7 +8,7 @@ from aehmc.metrics import gaussian_metric
 
 momentum_test_cases = [
     (1.0, 0.144),
-    (np.array([1.0]), 0.144),
+    (np.array([1.0]), np.array([0.144])),
     (np.array([1.0, 1.0]), np.array([0.144, 1.27])),
     (np.array([[1.0, 0], [0, 1.0]]), np.array([0.144, 1.27])),
 ]
@@ -16,7 +16,6 @@ momentum_test_cases = [
 
 @pytest.mark.parametrize("case", momentum_test_cases)
 def test_gaussian_metric_momentum(case):
-
     inverse_mass_matrix_val, expected_momentum = case
 
     # Momentum
@@ -26,15 +25,18 @@ def test_gaussian_metric_momentum(case):
         inverse_mass_matrix = at.vector("inverse_mass_matrix")
     else:
         inverse_mass_matrix = at.matrix("inverse_mass_matrix")
+
     momentum_fn, _, _ = gaussian_metric(inverse_mass_matrix)
     srng = RandomStream(seed=59)
     momentum_generator = aesara.function([inverse_mass_matrix], momentum_fn(srng))
-    assert momentum_generator(inverse_mass_matrix_val) == pytest.approx(
-        expected_momentum, 1e-2
-    )
+
+    momentum = momentum_generator(inverse_mass_matrix_val)
+    assert np.shape(momentum) == np.shape(expected_momentum)
+    assert momentum == pytest.approx(expected_momentum, 1e-2)
 
 
 kinetic_energy_test_cases = [
+    (1.0, 1.0, 0.5),
     (np.array([1.0]), np.array([1.0]), 0.5),
     (np.array([1.0, 1.0]), np.array([1.0, 1.0]), 1.0),
     (np.array([[1.0, 0], [0, 1.0]]), np.array([1.0, 1.0]), 1.0),
@@ -46,44 +48,73 @@ def test_gaussian_metric_kinetic_energy(case):
 
     inverse_mass_matrix_val, momentum_val, expected_energy = case
 
-    if inverse_mass_matrix_val.ndim == 1:
+    if np.ndim(inverse_mass_matrix_val) == 0:
+        inverse_mass_matrix = at.scalar("inverse_mass_matrix")
+        momentum = at.scalar("momentum")
+    elif np.ndim(inverse_mass_matrix_val) == 1:
         inverse_mass_matrix = at.vector("inverse_mass_matrix")
+        momentum = at.vector("momentum")
     else:
         inverse_mass_matrix = at.matrix("inverse_mass_matrix")
+        momentum = at.vector("momentum")
 
     _, kinetic_energy_fn, _ = gaussian_metric(inverse_mass_matrix)
-    momentum = at.vector("momentum")
     kinetic_energy = aesara.function(
         (inverse_mass_matrix, momentum), kinetic_energy_fn(momentum)
     )
 
-    assert kinetic_energy(inverse_mass_matrix_val, momentum_val) == expected_energy
+    kinetic = kinetic_energy(inverse_mass_matrix_val, momentum_val)
+    assert np.ndim(kinetic) == 0
+    assert kinetic == expected_energy
 
 
-turning_test_cases = [np.array([1.0, 1.0]), np.array([[1.0, 0.0], [0.0, 1.0]])]
+turning_test_cases = [
+    (1.0, 1.0, 1.0, 1.0),
+    (
+        np.array([1.0, 1.0]),  # inverse mass matrix
+        np.array([1.0, 1.0]),  # p_left
+        np.array([1.0, 1.0]),  # p_right
+        np.array([1.0, 1.0]),  # p_sum
+    ),
+    (
+        np.array([[1.0, 0.0], [0.0, 1.0]]),
+        np.array([1.0, 1.0]),
+        np.array([1.0, 1.0]),
+        np.array([1.0, 1.0]),
+    ),
+]
 
 
-@pytest.mark.parametrize("inverse_mass_matrix_val", turning_test_cases)
-def test_turning(inverse_mass_matrix_val):
+@pytest.mark.parametrize("case", turning_test_cases)
+def test_turning(case):
 
-    if inverse_mass_matrix_val.ndim == 1:
+    inverse_mass_matrix_val, p_left_val, p_right_val, p_sum_val = case
+
+    if np.ndim(inverse_mass_matrix_val) == 0:
+        inverse_mass_matrix = at.scalar("inverse_mass_matrix")
+        p_left = at.scalar("p_left")
+        p_right = at.scalar("p_right")
+        p_sum = at.scalar("p_sum")
+    elif np.ndim(inverse_mass_matrix_val) == 1:
         inverse_mass_matrix = at.vector("inverse_mass_matrix")
+        p_left = at.vector("p_left")
+        p_right = at.vector("p_right")
+        p_sum = at.vector("p_sum")
     else:
         inverse_mass_matrix = at.matrix("inverse_mass_matrix")
+        p_left = at.vector("p_left")
+        p_right = at.vector("p_right")
+        p_sum = at.vector("p_sum")
 
     _, _, turning_fn = gaussian_metric(inverse_mass_matrix)
 
-    p_left = at.vector("p_left")
-    p_right = at.vector("p_right")
-    p_sum = at.vector("p_sum")
     is_turning_fn = aesara.function(
         (inverse_mass_matrix, p_left, p_right, p_sum),
         turning_fn(p_left, p_right, p_sum),
     )
 
-    n_dim = np.shape(inverse_mass_matrix_val)[0]
     is_turning = is_turning_fn(
-        inverse_mass_matrix_val, np.ones(n_dim), np.ones(n_dim), np.ones(n_dim)
+        inverse_mass_matrix_val, p_left_val, p_right_val, p_sum_val
     )
 
     assert is_turning.ndim == 0
@@ -91,6 +122,7 @@ def test_turning(inverse_mass_matrix_val):
 
 
 def test_fail_wrong_mass_matrix_dimension():
+    """`gaussian_metric` should fail when the dimension of the mass matrix is greater than 2."""
     inverse_mass_matrix = np.array([[[1, 1], [1, 1]], [[1, 1], [1, 1]]])
     with pytest.raises(ValueError):
         _ = gaussian_metric(inverse_mass_matrix)

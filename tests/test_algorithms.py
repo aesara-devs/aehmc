@@ -41,31 +41,46 @@ def test_dual_averaging():
     assert last_x == pytest.approx(1.0, 1e-2)
 
 
-@pytest.mark.parametrize("n_dim", [1, 3])
+@pytest.mark.parametrize("num_dims", [0, 1, 3])
 @pytest.mark.parametrize("do_compute_covariance", [True, False])
-def test_welford_constant(n_dim, do_compute_covariance):
+def test_welford_constant(num_dims, do_compute_covariance):
     num_samples = 10
-    sample = at.ones(n_dim)  # constant samples
+
+    if num_dims > 0:
+        sample = at.ones((num_dims,))  # constant samples
+    else:
+        sample = at.constant(1.0)
 
     init, update, final = algorithms.welford_covariance(do_compute_covariance)
-    state = init(n_dim)
+    state = init(num_dims)
     for _ in range(num_samples):
         state = update(sample, *state)
 
     mean = state[0].eval()
-    expected = np.ones(n_dim)
-    np.testing.assert_allclose(mean, expected, rtol=1e-1)
+    if num_dims > 0:
+        expected = np.ones(num_dims)
+        assert np.shape(mean) == np.shape(expected)
+        np.testing.assert_allclose(mean, expected, rtol=1e-1)
+    else:
+        assert np.ndim(mean) == 0
+        assert mean == 1.0
 
     cov = final(state[1], state[2]).eval()
-    if do_compute_covariance:
-        expected = np.zeros((n_dim, n_dim))
+    if num_dims > 0:
+        if do_compute_covariance:
+            expected = np.zeros((num_dims, num_dims))
+        else:
+            expected = np.zeros(num_dims)
+
+        assert np.shape(cov) == np.shape(expected)
+        np.testing.assert_allclose(cov, expected)
     else:
-        expected = np.zeros(n_dim)
-    np.testing.assert_allclose(cov, expected)
+        assert np.ndim(cov) == 0
+        assert cov == 0
 
 
-@pytest.mark.parametrize("n_dim", [1, 3])
 @pytest.mark.parametrize("do_compute_covariance", [True, False])
+@pytest.mark.parametrize("n_dim", [1, 3])
 def test_welford(n_dim, do_compute_covariance):
     num_samples = 10
 
@@ -84,6 +99,7 @@ def test_welford(n_dim, do_compute_covariance):
         expected = 55.0 / 6.0 * np.ones((n_dim, n_dim))
     else:
         expected = 55.0 / 6.0 * np.ones(n_dim)
+    assert np.shape(cov) == np.shape(expected)
     np.testing.assert_allclose(cov, expected)
 
 
@@ -99,4 +115,5 @@ def test_welford_scalar(do_compute_covariance):
         state = update(sample, *state)
 
     cov = final(state[1], state[2]).eval()
+    assert np.ndim(cov) == 0
     assert pytest.approx(cov.squeeze()) == 55.0 / 6.0
