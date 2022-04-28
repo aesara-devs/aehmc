@@ -78,7 +78,7 @@ def test_dynamic_integration(case):
     srng = RandomStream(seed=59)
 
     def potential_fn(x):
-        return -at.sum(logprob(at.random.normal(0.0, 1.0), x))
+        return -at.sum(logprob(srng.normal(0.0, 1.0), x))
 
     step_size, should_diverge, should_turn = case
 
