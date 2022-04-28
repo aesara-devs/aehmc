@@ -158,8 +158,8 @@ def test_nuts_mcse():
             None,
             None,
         ],
-        non_sequences=1.0,
-        n_steps=3000,
+        non_sequences=0.5,
+        n_steps=2000,
     )
 
     trajectory_generator = aesara.function((y_vv,), trajectory[0], updates=updates)
