@@ -164,7 +164,7 @@ def test_nuts_mcse():
 
     trajectory_generator = aesara.function((y_vv,), trajectory[0], updates=updates)
 
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(seed=32098)
     posterior_samples = trajectory_generator(rng.standard_normal(2))[-1000:]
 
     error_prob = compute_error_probability(posterior_samples, loc)
@@ -213,7 +213,7 @@ def test_hmc_mcse():
 
     trajectory_generator = aesara.function((y_vv,), trajectory[0], updates=updates)
 
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(seed=23982)
     posterior_samples = trajectory_generator(rng.standard_normal(2))[-1000:]
 
     error_prob = compute_error_probability(posterior_samples, loc)
