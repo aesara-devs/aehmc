@@ -48,11 +48,16 @@ def run(
             (mean, m2, sample_size),
         )
 
-        chain_state, warmup_state = update(
+        (chain_state, warmup_state), inner_updates = update(
             stage, is_middle_window_end, chain_state, warmup_state
         )
 
-        return (*chain_state, *warmup_state[0], warmup_state[1], *warmup_state[2])
+        return (
+            *chain_state,
+            *warmup_state[0],
+            warmup_state[1],
+            *warmup_state[2],
+        ), inner_updates
 
     schedule = build_schedule(num_steps)
     stage = at.as_tensor([s[0] for s in schedule])
@@ -134,7 +139,7 @@ def window_adaptation(
 
         step_size = at.exp(da_state[1])
         kernel = kernel_factory(inverse_mass_matrix)
-        *chain_state, p_accept, _, _, _ = kernel(*chain_state, step_size)
+        (*chain_state, p_accept, _, _, _), updates = kernel(*chain_state, step_size)
 
         warmup_state = where_warmup_state(
             at.eq(stage, 0),
@@ -147,7 +152,7 @@ def window_adaptation(
             is_middle_window_end, slow_final(warmup_state), warmup_state
         )
 
-        return chain_state, warmup_state, updates
+        return (chain_state, warmup_state), updates
 
     def final(warmup_state: Tuple) -> Tuple[TensorVariable, TensorVariable]:
         da_state, inverse_mass_matrix, mm_state = warmup_state
