@@ -14,6 +14,7 @@ momentum_test_cases = [
 ]
 
 
+@pytest.mark.skip(reason="This test relies on a specific rng implementation and seed.")
 @pytest.mark.parametrize("case", momentum_test_cases)
 def test_gaussian_metric_momentum(case):
     inverse_mass_matrix_val, expected_momentum = case
