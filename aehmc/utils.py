@@ -28,6 +28,8 @@ class RaveledParamsMap:
         self.ref_shapes = [at.shape(p) for p in self.ref_params]
         self.ref_shapes = simplify_shapes(self.ref_shapes)
 
+        self.ref_dtypes = [p.dtype for p in self.ref_params]
+
         ref_shapes_ancestors = set(ancestors(self.ref_shapes))
         uninferred_shape_params = [
             p for p in self.ref_params if (p in ref_shapes_ancestors)
@@ -59,11 +61,12 @@ class RaveledParamsMap:
     ) -> Dict[TensorVariable, TensorVariable]:
         """Unravel a concatenated set of raveled parameters."""
         return {
-            k: v.reshape(s)
-            for k, v, s in zip(
+            k: v.reshape(s).astype(t)
+            for k, v, s, t in zip(
                 self.ref_params,
                 [raveled_params[slc] for slc in self.vec_slices],
                 self.ref_shapes,
+                self.ref_dtypes,
             )
         }
 
