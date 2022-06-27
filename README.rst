@@ -30,7 +30,7 @@ Example
 
     # Build the transition kernel
     srng = RandomStream(seed=0)
-    kernel = nuts.kernel(
+    kernel = nuts.new_kernel(
         srng,
         logprob_fn,
         inverse_mass_matrix=at.as_tensor(1.0),
@@ -41,7 +41,7 @@ Example
     initial_state = nuts.new_state(y_vv, logprob_fn)
 
     (
-        next_step,
+        next_state,
         potential_energy,
         potential_energy_grad,
         acceptance_prob,
@@ -50,7 +50,7 @@ Example
         is_diverging,
     ), updates = kernel(*initial_state, 1e-2)
 
-    next_step_fn = aesara.function([y_vv], next_step, updates=updates)
+    next_step_fn = aesara.function([y_vv], next_state, updates=updates)
 
     print(next_step_fn(0))
     # 0.14344008534533775

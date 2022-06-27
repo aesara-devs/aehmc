@@ -21,7 +21,7 @@ def test_warmup_scalar():
         return logprob
 
     def kernel_factory(inverse_mass_matrix: TensorVariable):
-        return nuts.kernel(
+        return nuts.new_kernel(
             srng,
             logprob_fn,
             inverse_mass_matrix,
@@ -66,7 +66,7 @@ def test_warmup_vector():
         return logprob
 
     def kernel_factory(inverse_mass_matrix: TensorVariable):
-        return nuts.kernel(
+        return nuts.new_kernel(
             srng,
             logprob_fn,
             inverse_mass_matrix,
@@ -118,7 +118,7 @@ def test_univariate_hmc(step_size, diverges):
         logprob = joint_logprob({Y_rv: y})
         return logprob
 
-    kernel = hmc.kernel(
+    kernel = hmc.new_kernel(
         srng,
         logprob_fn,
         inverse_mass_matrix,
@@ -209,7 +209,7 @@ def test_hmc_mcse():
 
     L = 30
     inverse_mass_matrix = at.as_tensor(scale)
-    kernel = hmc.kernel(srng, logprob_fn, inverse_mass_matrix, L)
+    kernel = hmc.new_kernel(srng, logprob_fn, inverse_mass_matrix, L)
 
     y_vv = Y_rv.clone()
     initial_state = hmc.new_state(y_vv, logprob_fn)
@@ -277,7 +277,7 @@ def test_nuts_mcse():
     (loc, scale, rho), Y_rv, logprob_fn = multivariate_normal_model(srng)
 
     inverse_mass_matrix = at.as_tensor(scale)
-    kernel = nuts.kernel(srng, logprob_fn, inverse_mass_matrix)
+    kernel = nuts.new_kernel(srng, logprob_fn, inverse_mass_matrix)
 
     y_vv = Y_rv.clone()
     initial_state = nuts.new_state(y_vv, logprob_fn)

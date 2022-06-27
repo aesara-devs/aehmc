@@ -36,7 +36,7 @@ def new_state(
     return q, potential_energy, potential_energy_grad
 
 
-def kernel(
+def new_kernel(
     srng: RandomStream,
     logprob_fn: TensorVariable,
     inverse_mass_matrix: TensorVariable,
