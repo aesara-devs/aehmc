@@ -34,11 +34,54 @@ def static_integration(
     integrator: Callable,
     num_integration_steps: int,
 ) -> Callable:
-    """Generate a trajectory by integrating several times in one direction."""
+    """Build a function that generates fixed-length trajectories.
+
+    Parameters
+    ----------
+    integrator
+       Function that performs one integration step.
+    num_integration_steps
+        The number of times we need to run the integrator every time the
+        returned function is called.
+
+    Returns
+    -------
+    A function that integrates the hamiltonian dynamics a
+    `num_integration_steps` times.
+
+    """
 
     def integrate(
-        q_init, p_init, energy_init, energy_grad_init, step_size
+        q_init: TensorVariable,
+        p_init: TensorVariable,
+        energy_init: TensorVariable,
+        energy_grad_init: TensorVariable,
+        step_size: TensorVariable,
     ) -> Tuple[IntegratorStateType, Dict]:
+        """Generate a trajectory by integrating several times in one direction.
+
+        Parameters
+        ----------
+        q_init
+            The initial position.
+        p_init
+            The initial value of the momentum.
+        energy_init
+            The initial value of the potential energy.
+        energy_grad_init
+            The initial value of the gradient of the potential energy wrt the position.
+        step_size
+            The size of each step taken by the integrator.
+
+        Returns
+        -------
+        A tuple with the last position, value of the momentum, potential energy,
+        gradient of the potential energy wrt the position in a tuple as well as
+        a dictionary that contains the update rules for all the shared variables
+        updated in `scan`.
+
+        """
+
         def one_step(q, p, potential_energy, potential_energy_grad):
             new_state = integrator(
                 q, p, potential_energy, potential_energy_grad, step_size
@@ -83,8 +126,10 @@ def dynamic_integration(
 
     Parameters
     ----------
+    srng
+        A RandomStream object that tracks the changes in a shared random state.
     integrator
-        The symplectic integrator used to integrate the hamiltonian trajectory.
+        The symplectic integrator used to integrate the hamiltonian dynamics.
     kinetic_energy
         Function to compute the current value of the kinetic energy.
     update_termination_state
@@ -93,6 +138,11 @@ def dynamic_integration(
         Determines whether the termination criterion has been met.
     divergence_threshold
         Value of the difference of energy between two consecutive states above which we say a transition is divergent.
+
+    Returns
+    -------
+    A function that integrates the trajectory in one direction and updates a
+    proposal until the termination criterion is met.
 
     """
     generate_proposal = proposal_generator(kinetic_energy, divergence_threshold)
@@ -111,8 +161,6 @@ def dynamic_integration(
 
         Parameters
         ----------
-        rng_key
-            Key used by JAX's random number generator.
         previous_last_state
             The last state of the previously integrated trajectory.
         direction int in {-1, 1}
@@ -127,6 +175,17 @@ def dynamic_integration(
             The step size of the symplectic integrator.
         initial_energy
             Initial energy H0 of the HMC step (not to confused with the initial energy of the subtree)
+
+        Returns
+        -------
+        A tuple with on the one hand: a new proposal (sampled from the states
+        traversed while building the trajectory), the last state, the sum of the
+        momenta values along the trajectory (needed for termination criterion),
+        the updated termination state, the number of integration steps
+        performed, a boolean that indicates whether the trajectory has diverged,
+        a boolean that indicates whether the termination criterion was met. And
+        on the other hand a dictionary that contains the update rules for the
+        shared variables updated in the internal `Scan` operator.
 
         """
 
@@ -269,6 +328,8 @@ def multiplicative_expansion(
 
     Parameters
     ----------
+    srng
+        A RandomStream object that tracks the changes in a shared random state.
     trajectory_integrator
         A function that runs the symplectic integrators and returns a new proposal
         and the integrated trajectory.
@@ -290,6 +351,32 @@ def multiplicative_expansion(
         initial_energy,
         step_size,
     ):
+        """Expand the current trajectory multiplicatively.
+
+        At each step we draw a direction at random, build a subtrajectory starting
+        from the leftmost or rightmost point of the current trajectory that is
+        twice as long as the current trajectory.
+
+        Once that is done, possibly update the current proposal with that of
+        the subtrajectory.
+
+        Parameters
+        ----------
+        proposal
+            Current new state proposal.
+        left_state
+            The current leftmost state of the trajectory.
+        right_state
+            The current rightmost state of the trajectory.
+        momentum_sum
+            The current value of the sum of momenta along the trajectory.
+        initial_energy
+            Potential energy before starting to build the trajectory.
+        step_size
+            The size of each step taken by the integrator.
+
+        """
+
         def expand_once(
             step,
             q_proposal,  # proposal
@@ -313,16 +400,6 @@ def multiplicative_expansion(
             idx_min,
             idx_max,
         ):
-            """Expand the current trajectory.
-
-            At each step we draw a direction at random, build a subtrajectory starting
-            from the leftmost or rightmost point of the current trajectory that is
-            twice as long as the current trajectory.
-
-            Once that is done, possibly update the current proposal with that of
-            the subtrajectory.
-
-            """
 
             left_state = (
                 q_left,

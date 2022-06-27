@@ -24,6 +24,8 @@ def kernel(
 
     Parameters
     ----------
+    srng
+        A RandomStream object that tracks the changes in a shared random state.
     logprob_fn
         A function that returns the value of the log-probability density
         function of a chain at a given position.
@@ -39,10 +41,18 @@ def kernel(
         The difference in energy above which we say the transition is
         divergent.
 
-    Return
-    ------
+    Returns
+    -------
 
     A function which, given a chain state, returns a new chain state.
+
+    References
+    ----------
+    .. [0]: Phan, Du, Neeraj Pradhan, and Martin Jankowiak. "Composable effects
+            for flexible and accelerated probabilistic programming in NumPyro." arXiv
+            preprint arXiv:1912.11554 (2019).
+    .. [1]: Lao, Junpeng, et al. "tfp. mcmc: Modern markov chain monte carlo
+            tools built for modern hardware." arXiv preprint arXiv:2002.01184 (2020).
 
     """
 
@@ -77,15 +87,27 @@ def kernel(
         potential_energy_grad: TensorVariable,
         step_size: TensorVariable,
     ):
-        """Move the chain by one step.
+        """Use the NUTS algorithm to propose a new state.
 
         Parameters
         ----------
-        logprob_fn
-            A function that returns the value of the log-probability density
-            function of a chain at a given position.
+        q
+            The initial position.
+        potential_energy
+            The initial value of the potential energy.
+        potential_energy_grad
+            The initial value of the gradient of the potential energy wrt the position.
         step_size
             The step size used in the symplectic integrator
+
+        Returns
+        -------
+        A tuple that contains on the one hand: the new position, value of the
+        potential energy, gradient of the potential energy, the acceptance
+        probability, the number of times the trajectory expanded, whether the
+        integration diverged, whether the trajectory turned on itself. On the
+        other hand a dictionary that contains the update rules for the shared
+        variables updated in the scan operator.
 
         """
         p = momentum_generator(srng)
