@@ -434,7 +434,7 @@ def multiplicative_expansion(
 
             do_go_right = srng.bernoulli(0.5)
             direction = at.where(do_go_right, 1.0, -1.0)
-            start_state = where_state(do_go_right, right_state, left_state)
+            start_state = ifelse(do_go_right, right_state, left_state)
 
             (
                 new_proposal,
@@ -456,8 +456,8 @@ def multiplicative_expansion(
             # Update the trajectory.
             # The trajectory integrator always integrates forward in time; we
             # thus need to switch the states if the other direction was picked.
-            new_left_state = where_state(do_go_right, left_state, new_state)
-            new_right_state = where_state(do_go_right, new_state, right_state)
+            new_left_state = ifelse(do_go_right, left_state, new_state)
+            new_right_state = ifelse(do_go_right, new_state, right_state)
             new_momentum_sum = momentum_sum + subtree_momentum_sum
 
             # Compute the pseudo-acceptance probability for the NUTS algorithm.
@@ -534,27 +534,6 @@ def multiplicative_expansion(
     return expand
 
 
-def where_state(
-    do_pick_left: bool,
-    left_state: IntegratorStateType,
-    right_state: IntegratorStateType,
-) -> IntegratorStateType:
-    """Represents a switch between two states depending on a condition."""
-    q_left, p_left, potential_energy_left, potential_energy_grad_left = left_state
-    q_right, p_right, potential_energy_right, potential_energy_grad_right = right_state
-
-    q = ifelse(do_pick_left, q_left, q_right)
-    p = ifelse(do_pick_left, p_left, p_right)
-    potential_energy = at.where(
-        do_pick_left, potential_energy_left, potential_energy_right
-    )
-    potential_energy_grad = ifelse(
-        do_pick_left, potential_energy_grad_left, potential_energy_grad_right
-    )
-
-    return (q, p, potential_energy, potential_energy_grad)
-
-
 def where_proposal(
     do_pick_left: bool,
     left_proposal: ProposalStateType,
@@ -564,7 +543,7 @@ def where_proposal(
     left_state, left_weight, left_energy, left_log_sum_p_accept = left_proposal
     right_state, right_weight, right_energy, right_log_sum_p_accept = right_proposal
 
-    state = where_state(do_pick_left, left_state, right_state)
+    state = ifelse(do_pick_left, left_state, right_state)
     energy = at.where(do_pick_left, left_energy, right_energy)
     weight = at.where(do_pick_left, left_weight, right_weight)
     log_sum_p_accept = ifelse(
