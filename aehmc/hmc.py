@@ -15,6 +15,22 @@ import aehmc.trajectory as trajectory
 def new_state(
     q: TensorVariable, logprob_fn: Callable
 ) -> Tuple[TensorVariable, TensorVariable, TensorVariable]:
+    """Create a new HMC state from a position.
+
+    Parameters
+    ----------
+    q
+        The chain's position.
+    logprob_fn
+        The function that computes the value of the log-probability density
+        function at any position.
+
+    Returns
+    -------
+    A new HMC state, i.e. a tuple with the position, current value of the
+    potential energy and gradient of the potential energy.
+
+    """
     potential_energy = -logprob_fn(q)
     potential_energy_grad = aesara.grad(potential_energy, wrt=q)
     return q, potential_energy, potential_energy_grad
@@ -31,12 +47,17 @@ def kernel(
 
     Parameters
     ----------
+    srng
+        A RandomStream object that tracks the changes in a shared random state.
     logprob_fn
         A function that returns the value of the log-probability density
         function of a chain at a given position.
     inverse_mass_matrix
         One or two-dimensional array used as the inverse mass matrix that
         defines the euclidean metric.
+    num_integration_steps
+        The number of times we need to run the integrator every time the
+        returned function is called.
     divergence_threshold
         The difference in energy above which we say the transition is
         divergent.
@@ -45,6 +66,11 @@ def kernel(
     -------
     A kernel that takes the current state of the chain and that returns a new
     state.
+
+    References
+    ----------
+    .. [0]: Neal, Radford M. "MCMC using Hamiltonian dynamics." Handbook of markov
+            chain monte carlo 2.11 (2011): 2.
 
 
     """
@@ -68,13 +94,26 @@ def kernel(
         potential_energy: TensorVariable,
         potential_energy_grad: TensorVariable,
         step_size: TensorVariable,
-    ) -> Tuple[Tuple[TensorVariable, TensorVariable, TensorVariable, bool], Dict]:
+    ) -> Tuple[Tuple[TensorVariable, TensorVariable, TensorVariable, float], Dict]:
         """Perform a single step of the HMC algorithm.
 
         Parameters
         ----------
+        q
+            The initial position.
+        potential_energy
+            The initial value of the potential energy.
+        potential_energy_grad
+            The initial value of the gradient of the potential energy wrt the position.
         step_size
             The step size used in the symplectic integrator
+
+        Returns
+        -------
+        A tuple that contains on the one hand: the new position, value of the
+        potential energy, gradient of the potential energy and acceptance
+        propbability. On the other hand a dictionaruy that contains the update
+        rules for the shared variables updated in the scan operator.
 
         """
         p = momentum_generator(srng)
@@ -87,6 +126,7 @@ def kernel(
         ), updates = proposal_generator(
             srng, q, p, potential_energy, potential_energy_grad, step_size
         )
+
         return (
             q_new,
             potential_energy_new,
@@ -103,8 +143,26 @@ def hmc_proposal(
     num_integration_steps: TensorVariable,
     divergence_threshold: int,
 ) -> Callable:
-    """Builds a function that returns a HMC proposal."""
+    """Builds a function that returns a HMC proposal.
 
+    Parameters
+    --------
+    integrator
+        The symplectic integrator used to integrate the hamiltonian dynamics.
+    kinetic_energy
+        The function used to compute the kinetic energy.
+    num_integration_steps
+        The number of times we need to run the integrator every time the
+        returned function is called.
+    divergence_threshold
+        The difference in energy above which we say the transition is
+        divergent.
+
+    Returns
+    -------
+    A function that generates a new state for the chain.
+
+    """
     integrate = trajectory.static_integration(integrator, num_integration_steps)
 
     def propose(
@@ -124,7 +182,29 @@ def hmc_proposal(
         ],
         Dict,
     ]:
-        """Use the HMC algorithm to propose a new state."""
+        """Use the HMC algorithm to propose a new state.
+
+        Parameters
+        ----------
+        srng
+            A RandomStream object that tracks the changes in a shared random state.
+        q
+            The initial position.
+        potential_energy
+            The initial value of the potential energy.
+        potential_energy_grad
+            The initial value of the gradient of the potential energy wrt the position.
+        step_size
+            The step size used in the symplectic integrator
+
+        Returns
+        -------
+        A tuple that contains on the one hand: the new position, value of the
+        potential energy, gradient of the potential energy and acceptance
+        probability. On the other hand a dictionary that contains the update
+        rules for the shared variables updated in the scan operator.
+
+        """
 
         (
             new_q,

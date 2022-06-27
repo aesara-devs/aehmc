@@ -8,7 +8,7 @@ from aesara.scan.utils import until
 from aesara.tensor.var import TensorVariable
 
 
-def iterative_uturn(is_turning_fn: Callable):
+def iterative_uturn(is_turning_fn: Callable) -> Tuple[Callable, Callable, Callable]:
     """U-Turn termination criterion to check reversiblity while expanding
     the trajectory.
 
@@ -33,8 +33,8 @@ def iterative_uturn(is_turning_fn: Callable):
     """
 
     def new_state(
-        position: TensorVariable, max_num_doublings: int
-    ) -> Tuple[TensorVariable, TensorVariable, int, int]:
+        position: TensorVariable, max_num_doublings: TensorVariable
+    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable, TensorVariable]:
         """Initialize the termination state
 
         Parameters
@@ -46,6 +46,10 @@ def iterative_uturn(is_turning_fn: Callable):
             Maximum number of doublings allowed in the multiplicative
             expansion. Determines the maximum number of momenta and momentum
             sums to store.
+
+        Returns
+        -------
+        A tuple that represents a new state for the termination criterion.
 
         """
         if position.ndim == 0:
@@ -69,7 +73,7 @@ def iterative_uturn(is_turning_fn: Callable):
         momentum_sum: TensorVariable,
         momentum: TensorVariable,
         step: TensorVariable,
-    ):
+    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable, TensorVariable]:
         """Update the termination state.
 
         Parameters
@@ -85,7 +89,7 @@ def iterative_uturn(is_turning_fn: Callable):
 
         Return
         ------
-        The new termination state.
+        A tuple that represents the updated termination state.
 
         """
         momentum_ckpt, momentum_sum_ckpt, *_ = state
@@ -108,7 +112,7 @@ def iterative_uturn(is_turning_fn: Callable):
 
     def is_iterative_turning(
         state: Tuple, momentum_sum: TensorVariable, momentum: TensorVariable
-    ):
+    ) -> bool:
         """Check if any sub-trajectory is making a U-turn.
 
         If we visualize the trajectory as a balanced binary tree, the
@@ -161,7 +165,7 @@ def iterative_uturn(is_turning_fn: Callable):
     return new_state, update, is_iterative_turning
 
 
-def _find_storage_indices(step: TensorVariable):
+def _find_storage_indices(step: TensorVariable) -> Tuple[int, int]:
     """Find the indices between which the momenta and sums are stored.
 
     Parameter

@@ -21,14 +21,7 @@ def gaussian_metric(
     ---------
     inverse_mass_matrix
         One or two-dimensional array corresponding respectively to a diagonal
-        or dense mass matrix. The inverse mass matrix is multiplied to a
-        flattened version of the Pytree in which the chain position is stored
-        (the current value of the random variables). The order of the variables
-        should thus match JAX's tree flattening order, and more specifically
-        that of `ravel_pytree`.
-        In particular, JAX sorts dictionaries by key when flattening them. The
-        value of each variables will appear in the flattened Pytree following
-        the order given by `sort(keys)`.
+        or dense mass matrix.
 
     Returns
     -------

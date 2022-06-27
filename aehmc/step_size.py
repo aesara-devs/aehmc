@@ -12,26 +12,26 @@ def dual_averaging_adaptation(
     t0: int = 10,
     kappa: float = 0.75,
 ) -> Tuple[Callable, Callable]:
-    """Tune the step size to achieve a desired target acceptance rate.
+    r"""Tune the step size to achieve a desired target acceptance rate.
 
-    Let us note :math:`\\epsilon` the current step size, :math:`\\alpha_t` the
-    metropolis acceptance rate at time :math:`t` and :math:`\\delta` the desired
+    Let us note :math:`\epsilon` the current step size, :math:`\alpha_t` the
+    metropolis acceptance rate at time :math:`t` and :math:`\delta` the desired
     aceptance rate. We define:
 
     .. math:
-        H_t = \\delta - \\alpha_t
+        H_t = \delta - \alpha_t
 
     the error at time t. We would like to find a procedure that adapts the
-    value of :math:`\\epsilon` such that :math:`h(x) =\\mathbb{E}\\left[H_t|\\epsilon\\right] = 0`
+    value of :math:`\epsilon` such that :math:`h(x) =\mathbb{E}\left[H_t|\epsilon\right] = 0`
     Following [1]_, the authors of [2]_ proposed the following update scheme. If
-    we note :math:``x = \\log \\epsilon` we follow:
+    we note :math:``x = \log \epsilon` we follow:
 
     .. math:
-        x_{t+1} \\LongLeftArrow \\mu - \\frac{\\sqrt{t}}{\\gamma} \\frac{1}{t+t_0} \\sum_{i=1}^t H_i
-        \\overline{x}_{t+1} \\LongLeftArrow x_{t+1}\\, t^{-\\kappa}  + \\left(1-t^\\kappa\\right)\\overline{x}_t
+        x_{t+1} \LongLeftArrow \mu - \frac{\sqrt{t}}{\gamma} \frac{1}{t+t_0} \sum_{i=1}^t H_i
+        \overline{x}_{t+1} \LongLeftArrow x_{t+1}\\, t^{-\kappa}  + \left(1-t^\kappa\right)\overline{x}_t
 
-    :math:`\\overline{x}_{t}` is guaranteed to converge to a value such that
-    :math:`h(\\overline{x}_t)` converges to 0, i.e. the Metropolis acceptance
+    :math:`\overline{x}_{t}` is guaranteed to converge to a value such that
+    :math:`h(\overline{x}_t)` converges to 0, i.e. the Metropolis acceptance
     rate converges to the desired rate.
 
     See reference [2]_ (section 3.2.1) for a detailed discussion.
@@ -69,6 +69,7 @@ def dual_averaging_adaptation(
     .. [2]: Hoffman, Matthew D., and Andrew Gelman. "The No-U-Turn sampler:
             adaptively setting path lengths in Hamiltonian Monte Carlo." Journal
             of Machine Learning Research 15.1 (2014): 1593-1623.
+
     """
     da_init, da_update = algorithms.dual_averaging(gamma, t0, kappa)
 
@@ -80,6 +81,24 @@ def dual_averaging_adaptation(
         gradient_avg: TensorVariable,
         mu: TensorVariable,
     ) -> Tuple[TensorVariable, TensorVariable, TensorVariable, TensorVariable]:
+        """Update the dual averaging adaptation state.
+
+        Parameters
+        ----------
+        acceptance_probability
+            The acceptance probability returned by the sampling algorithm.
+        step
+            The current step number.
+        log_step_size
+            The logarithm of the current value of the current step size.
+        log_step_size_avg
+            The average of the logarithm of the current step size.
+        gradient_avg
+            The current value of the averaged gradients.
+        mu
+            The points towards which iterates are shrunk.
+
+        """
         gradient = target_acceptance_rate - acceptance_probability
         return da_update(
             gradient, step, log_step_size, log_step_size_avg, gradient_avg, mu

@@ -18,7 +18,7 @@ def covariance_adaptation(
     Parameters
     ----------
     is_mass_matrix_full
-        When Flase the algorithm adapts and returns a diagonal mass matrix
+        When False the algorithm adapts and returns a diagonal mass matrix
         (default), otherwise adapts and returns a dense mass matrix.
 
     Returns
@@ -45,6 +45,11 @@ def covariance_adaptation(
             The number of dimensions of the mass matrix, which corresponds to
             the number of dimensions of the chain position.
 
+        Returns
+        -------
+        The initial value of the mass matrix and the initial state of the
+        Welford covariance algorithm.
+
         """
         if n_dims == 0:
             inverse_mass_matrix = at.constant(1.0, dtype=config.floatX)
@@ -64,11 +69,9 @@ def covariance_adaptation(
 
         Parameters
         ----------
-        position:
+        position
             The current position of the chain.
-        inverse_mass_matrix:
-            Current value of the inverse mass matrix.
-        wc_state:
+        wc_state
             Current state of Welford's algorithm to compute covariance.
 
         """
@@ -80,6 +83,15 @@ def covariance_adaptation(
 
         In this step we compute the mass matrix from the covariance matrix computed
         by the Welford algorithm, applying the shrinkage used in Stan [1]_.
+
+        Parameters
+        ----------
+        wc_state
+            Current state of Welford's algorithm to compute covariance.
+
+        Returns
+        -------
+        The value of the inverse mass matrix computed from the covariance estimate.
 
         References
         ----------
