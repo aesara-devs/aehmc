@@ -2,6 +2,7 @@ from typing import Callable, Dict, Tuple
 
 import aesara
 import aesara.tensor as at
+import numpy as np
 from aesara.ifelse import ifelse
 from aesara.scan.utils import until
 from aesara.tensor.random.utils import RandomStream
@@ -277,7 +278,7 @@ def dynamic_integration(
                 *state,
                 momentum_sum,
                 *termination_state,
-                at.as_tensor(1, dtype="int32"),
+                at.as_tensor(1, dtype=np.int32),
                 None,
                 None,
             ),
