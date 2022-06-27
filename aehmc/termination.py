@@ -3,6 +3,7 @@ from typing import Callable, Tuple
 import aesara
 import aesara.tensor as at
 import numpy as np
+from aesara import config as config
 from aesara.ifelse import ifelse
 from aesara.scan.utils import until
 from aesara.tensor.var import TensorVariable
@@ -54,18 +55,18 @@ def iterative_uturn(is_turning_fn: Callable) -> Tuple[Callable, Callable, Callab
         """
         if position.ndim == 0:
             return (
-                at.zeros(max_num_doublings),
-                at.zeros(max_num_doublings),
-                at.constant(0, dtype=np.int32),
-                at.constant(0, dtype=np.int32),
+                at.zeros(max_num_doublings, dtype=config.floatX),
+                at.zeros(max_num_doublings, dtype=config.floatX),
+                at.constant(0, dtype=np.int64),
+                at.constant(0, dtype=np.int64),
             )
         else:
             num_dims = position.shape[0]
             return (
-                at.zeros((max_num_doublings, num_dims)),
-                at.zeros((max_num_doublings, num_dims)),
-                at.constant(0, dtype=np.int32),
-                at.constant(0, dtype=np.int32),
+                at.zeros((max_num_doublings, num_dims), dtype=config.floatX),
+                at.zeros((max_num_doublings, num_dims), dtype=config.floatX),
+                at.constant(0, dtype=np.int64),
+                at.constant(0, dtype=np.int64),
             )
 
     def update(
@@ -199,8 +200,8 @@ def _find_storage_indices(step: TensorVariable) -> Tuple[int, int]:
         new_nc1 = nc1 + (nc0 & 1)
         return (new_nc0, new_nc1), until(do_stop)
 
-    init = at.as_tensor(step // 2).astype(np.int32)
-    init_nc1 = at.constant(0).astype(np.int32)
+    init = at.as_tensor(step // 2, dtype=np.int64)
+    init_nc1 = at.constant(0, dtype=np.int64)
     (nc0, nc1), _ = aesara.scan(
         find_idx_max, outputs_info=(init, init_nc1), n_steps=step + 1
     )

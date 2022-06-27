@@ -48,7 +48,7 @@ def test_iterative_turning_termination(
     [(0, (1, 0)), (6, (3, 2)), (7, (0, 2)), (13, (2, 2)), (15, (0, 3))],
 )
 def test_leaf_idx_to_ckpt_idx(step, expected_idx):
-    step_tt = at.scalar("step", dtype="int32")
+    step_tt = at.scalar("step", dtype=np.int32)
     idx_tt = _find_storage_indices(step_tt)
     fn = aesara.function((step_tt,), (*idx_tt,))
 
