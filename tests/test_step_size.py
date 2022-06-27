@@ -16,7 +16,7 @@ def init():
 
     srng = RandomStream(seed=0)
     inverse_mass_matrix = at.as_tensor(1.0)
-    kernel = hmc.kernel(srng, logprob_fn, inverse_mass_matrix, 10)
+    kernel = hmc.new_kernel(srng, logprob_fn, inverse_mass_matrix, 10)
 
     initial_position = at.as_tensor(1.0, dtype=config.floatX)
     initial_state = hmc.new_state(initial_position, logprob_fn)

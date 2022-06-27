@@ -12,7 +12,7 @@ from aehmc.trajectory import dynamic_integration, multiplicative_expansion
 new_state = hmc.new_state
 
 
-def kernel(
+def new_kernel(
     srng: RandomStream,
     logprob_fn: Callable[[TensorVariable], TensorVariable],
     inverse_mass_matrix: TensorVariable,
