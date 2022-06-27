@@ -94,7 +94,16 @@ def new_kernel(
         potential_energy: TensorVariable,
         potential_energy_grad: TensorVariable,
         step_size: TensorVariable,
-    ) -> Tuple[Tuple[TensorVariable, TensorVariable, TensorVariable, float], Dict]:
+    ) -> Tuple[
+        Tuple[
+            TensorVariable,
+            TensorVariable,
+            TensorVariable,
+            TensorVariable,
+            TensorVariable,
+        ],
+        Dict,
+    ]:
         """Perform a single step of the HMC algorithm.
 
         Parameters
@@ -122,7 +131,8 @@ def new_kernel(
             _,
             potential_energy_new,
             potential_energy_grad_new,
-            p_accept,
+            acceptance_probability,
+            is_divergent,
         ), updates = proposal_generator(
             srng, q, p, potential_energy, potential_energy_grad, step_size
         )
@@ -131,7 +141,8 @@ def new_kernel(
             q_new,
             potential_energy_new,
             potential_energy_grad_new,
-            p_accept,
+            acceptance_probability,
+            is_divergent,
         ), updates
 
     return step
@@ -179,6 +190,7 @@ def hmc_proposal(
             TensorVariable,
             TensorVariable,
             TensorVariable,
+            TensorVariable,
         ],
         Dict,
     ]:
@@ -221,7 +233,7 @@ def hmc_proposal(
         new_energy = new_potential_energy + kinetic_energy(flipped_p)
         delta_energy = energy - new_energy
         delta_energy = at.where(at.isnan(delta_energy), -np.inf, delta_energy)
-        # is_transition_divergence = at.abs(delta_energy) > divergence_threshold
+        is_transition_divergent = at.abs(delta_energy) > divergence_threshold
 
         p_accept = at.clip(at.exp(delta_energy), 0, 1.0)
         do_accept = srng.bernoulli(p_accept)
@@ -242,6 +254,7 @@ def hmc_proposal(
             final_potential_energy,
             final_potential_energy_grad,
             p_accept,
+            is_transition_divergent,
         ), updates
 
     return propose

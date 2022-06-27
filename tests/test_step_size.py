@@ -32,7 +32,7 @@ def test_dual_averaging_adaptation(init):
     step, logstepsize, logstepsize_avg, gradient_avg, mu = init_fn(init_stepsize)
 
     def one_step(q, logprob, logprob_grad, step, x_t, x_avg, gradient_avg, mu):
-        (*state, p_accept), inner_updates = kernel(
+        (*state, p_accept, _), inner_updates = kernel(
             q, logprob, logprob_grad, at.exp(x_t)
         )
         da_state = update_fn(p_accept, step, x_t, x_avg, gradient_avg, mu)
