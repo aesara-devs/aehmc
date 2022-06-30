@@ -15,12 +15,10 @@ new_state = hmc.new_state
 def new_kernel(
     srng: RandomStream,
     logprob_fn: Callable[[TensorVariable], TensorVariable],
-    inverse_mass_matrix: TensorVariable,
     max_num_expansions: int = 10,
     divergence_threshold: int = 1000,
 ) -> Callable:
     """Build an iterative NUTS kernel.
-
 
     Parameters
     ----------
@@ -29,11 +27,6 @@ def new_kernel(
     logprob_fn
         A function that returns the value of the log-probability density
         function of a chain at a given position.
-    step_size
-        The step size used in the symplectic integrator
-    inverse_mass_matrix
-        One or two-dimensional array used as the inverse mass matrix that
-        defines the euclidean metric.
     max_num_expansions
         The maximum number of times we double the length of the trajectory.
         Known as the maximum tree depth in most implementations.
@@ -43,7 +36,6 @@ def new_kernel(
 
     Returns
     -------
-
     A function which, given a chain state, returns a new chain state.
 
     References
@@ -59,33 +51,12 @@ def new_kernel(
     def potential_fn(x):
         return -logprob_fn(x)
 
-    momentum_generator, kinetic_energy_fn, uturn_check_fn = metrics.gaussian_metric(
-        inverse_mass_matrix
-    )
-    symplectic_integrator = integrators.velocity_verlet(potential_fn, kinetic_energy_fn)
-    new_termination_state, update_termination_state, is_criterion_met = iterative_uturn(
-        uturn_check_fn
-    )
-    trajectory_integrator = dynamic_integration(
-        srng,
-        symplectic_integrator,
-        kinetic_energy_fn,
-        update_termination_state,
-        is_criterion_met,
-        divergence_threshold,
-    )
-    expand = multiplicative_expansion(
-        srng,
-        trajectory_integrator,
-        uturn_check_fn,
-        max_num_expansions,
-    )
-
     def step(
         q: TensorVariable,
         potential_energy: TensorVariable,
         potential_energy_grad: TensorVariable,
         step_size: TensorVariable,
+        inverse_mass_matrix: TensorVariable,
     ):
         """Use the NUTS algorithm to propose a new state.
 
@@ -99,6 +70,9 @@ def new_kernel(
             The initial value of the gradient of the potential energy wrt the position.
         step_size
             The step size used in the symplectic integrator
+        inverse_mass_matrix
+            One or two-dimensional array used as the inverse mass matrix that
+            defines the euclidean metric.
 
         Returns
         -------
@@ -110,6 +84,32 @@ def new_kernel(
         variables updated in the scan operator.
 
         """
+        momentum_generator, kinetic_energy_fn, uturn_check_fn = metrics.gaussian_metric(
+            inverse_mass_matrix
+        )
+        symplectic_integrator = integrators.velocity_verlet(
+            potential_fn, kinetic_energy_fn
+        )
+        (
+            new_termination_state,
+            update_termination_state,
+            is_criterion_met,
+        ) = iterative_uturn(uturn_check_fn)
+        trajectory_integrator = dynamic_integration(
+            srng,
+            symplectic_integrator,
+            kinetic_energy_fn,
+            update_termination_state,
+            is_criterion_met,
+            divergence_threshold,
+        )
+        expand = multiplicative_expansion(
+            srng,
+            trajectory_integrator,
+            uturn_check_fn,
+            max_num_expansions,
+        )
+
         p = momentum_generator(srng)
         initial_state = (q, p, potential_energy, potential_energy_grad)
         initial_termination_state = new_termination_state(q, max_num_expansions)

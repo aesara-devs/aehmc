@@ -38,9 +38,7 @@ def new_state(
 
 def new_kernel(
     srng: RandomStream,
-    logprob_fn: TensorVariable,
-    inverse_mass_matrix: TensorVariable,
-    num_integration_steps: int,
+    logprob_fn: Callable,
     divergence_threshold: int = 1000,
 ) -> Callable:
     """Build a HMC kernel.
@@ -52,12 +50,6 @@ def new_kernel(
     logprob_fn
         A function that returns the value of the log-probability density
         function of a chain at a given position.
-    inverse_mass_matrix
-        One or two-dimensional array used as the inverse mass matrix that
-        defines the euclidean metric.
-    num_integration_steps
-        The number of times we need to run the integrator every time the
-        returned function is called.
     divergence_threshold
         The difference in energy above which we say the transition is
         divergent.
@@ -78,30 +70,15 @@ def new_kernel(
     def potential_fn(x):
         return -logprob_fn(x)
 
-    momentum_generator, kinetic_energy_fn, _ = metrics.gaussian_metric(
-        inverse_mass_matrix
-    )
-    symplectic_integrator = integrators.velocity_verlet(potential_fn, kinetic_energy_fn)
-    proposal_generator = hmc_proposal(
-        symplectic_integrator,
-        kinetic_energy_fn,
-        num_integration_steps,
-        divergence_threshold,
-    )
-
     def step(
         q: TensorVariable,
         potential_energy: TensorVariable,
         potential_energy_grad: TensorVariable,
         step_size: TensorVariable,
+        inverse_mass_matrix: TensorVariable,
+        num_integration_steps: int,
     ) -> Tuple[
-        Tuple[
-            TensorVariable,
-            TensorVariable,
-            TensorVariable,
-            TensorVariable,
-            TensorVariable,
-        ],
+        Tuple[TensorVariable, TensorVariable, TensorVariable, TensorVariable, bool],
         Dict,
     ]:
         """Perform a single step of the HMC algorithm.
@@ -116,6 +93,11 @@ def new_kernel(
             The initial value of the gradient of the potential energy wrt the position.
         step_size
             The step size used in the symplectic integrator
+        inverse_mass_matrix
+            One or two-dimensional array used as the inverse mass matrix that
+            defines the euclidean metric.
+        num_integration_steps
+            The number of times we run the integrator at each step.
 
         Returns
         -------
@@ -125,6 +107,20 @@ def new_kernel(
         rules for the shared variables updated in the scan operator.
 
         """
+
+        momentum_generator, kinetic_energy_fn, _ = metrics.gaussian_metric(
+            inverse_mass_matrix
+        )
+        symplectic_integrator = integrators.velocity_verlet(
+            potential_fn, kinetic_energy_fn
+        )
+        proposal_generator = hmc_proposal(
+            symplectic_integrator,
+            kinetic_energy_fn,
+            num_integration_steps,
+            divergence_threshold,
+        )
+
         p = momentum_generator(srng)
         (
             q_new,

@@ -139,7 +139,9 @@ def window_adaptation(
 
         step_size = at.exp(da_state[1])
         kernel = kernel_factory(inverse_mass_matrix)
-        (*chain_state, p_accept, _, _, _), updates = kernel(*chain_state, step_size)
+        (*chain_state, p_accept, _, _, _), updates = kernel(
+            *chain_state, step_size, inverse_mass_matrix
+        )
 
         warmup_state = where_warmup_state(
             at.eq(stage, 0),
