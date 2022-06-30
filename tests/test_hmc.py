@@ -21,11 +21,7 @@ def test_warmup_scalar():
         return logprob
 
     def kernel_factory(inverse_mass_matrix: TensorVariable):
-        return nuts.new_kernel(
-            srng,
-            logprob_fn,
-            inverse_mass_matrix,
-        )
+        return nuts.new_kernel(srng, logprob_fn)
 
     y_vv = Y_rv.clone()
     initial_state = nuts.new_state(y_vv, logprob_fn)
@@ -66,11 +62,7 @@ def test_warmup_vector():
         return logprob
 
     def kernel_factory(inverse_mass_matrix: TensorVariable):
-        return nuts.new_kernel(
-            srng,
-            logprob_fn,
-            inverse_mass_matrix,
-        )
+        return nuts.new_kernel(srng, logprob_fn)
 
     y_vv = Y_rv.clone()
     initial_state = nuts.new_state(y_vv, logprob_fn)
@@ -118,12 +110,7 @@ def test_univariate_hmc(step_size, diverges):
         logprob = joint_logprob({Y_rv: y})
         return logprob
 
-    kernel = hmc.new_kernel(
-        srng,
-        logprob_fn,
-        inverse_mass_matrix,
-        num_integration_steps,
-    )
+    kernel = hmc.new_kernel(srng, logprob_fn)
 
     y_vv = Y_rv.clone()
     initial_state = hmc.new_state(y_vv, logprob_fn)
@@ -137,7 +124,7 @@ def test_univariate_hmc(step_size, diverges):
             None,
             None,
         ],
-        non_sequences=step_size,
+        non_sequences=(step_size, inverse_mass_matrix, num_integration_steps),
         n_steps=2_000,
     )
 
@@ -208,9 +195,10 @@ def test_hmc_mcse():
     srng = at.random.RandomStream(seed=1)
     (loc, scale, rho), Y_rv, logprob_fn = multivariate_normal_model(srng)
 
+    step_size = 1.0
     L = 30
     inverse_mass_matrix = at.as_tensor(scale)
-    kernel = hmc.new_kernel(srng, logprob_fn, inverse_mass_matrix, L)
+    kernel = hmc.new_kernel(srng, logprob_fn)
 
     y_vv = Y_rv.clone()
     initial_state = hmc.new_state(y_vv, logprob_fn)
@@ -224,7 +212,7 @@ def test_hmc_mcse():
             None,
             None,
         ],
-        non_sequences=1.0,
+        non_sequences=(step_size, inverse_mass_matrix, L),
         n_steps=3000,
     )
 
@@ -278,8 +266,9 @@ def test_nuts_mcse():
     srng = at.random.RandomStream(seed=1)
     (loc, scale, rho), Y_rv, logprob_fn = multivariate_normal_model(srng)
 
+    step_size = at.as_tensor(1.0)
     inverse_mass_matrix = at.as_tensor(scale)
-    kernel = nuts.new_kernel(srng, logprob_fn, inverse_mass_matrix)
+    kernel = nuts.new_kernel(srng, logprob_fn)
 
     y_vv = Y_rv.clone()
     initial_state = nuts.new_state(y_vv, logprob_fn)
@@ -295,7 +284,7 @@ def test_nuts_mcse():
             None,
             None,
         ],
-        non_sequences=1.0,
+        non_sequences=(step_size, inverse_mass_matrix),
         n_steps=3000,
     )
 

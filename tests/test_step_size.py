@@ -15,8 +15,7 @@ def init():
         return -2 * (x - 1.0) ** 2
 
     srng = RandomStream(seed=0)
-    inverse_mass_matrix = at.as_tensor(1.0)
-    kernel = hmc.new_kernel(srng, logprob_fn, inverse_mass_matrix, 10)
+    kernel = hmc.new_kernel(srng, logprob_fn)
 
     initial_position = at.as_tensor(1.0, dtype=config.floatX)
     initial_state = hmc.new_state(initial_position, logprob_fn)
@@ -28,12 +27,20 @@ def test_dual_averaging_adaptation(init):
     initial_state, kernel = init
 
     init_stepsize = at.as_tensor(1.0, dtype=config.floatX)
+    inverse_mass_matrix = at.as_tensor(1.0)
+    num_integration_steps = 10
+
     init_fn, update_fn = dual_averaging_adaptation()
     step, logstepsize, logstepsize_avg, gradient_avg, mu = init_fn(init_stepsize)
 
     def one_step(q, logprob, logprob_grad, step, x_t, x_avg, gradient_avg, mu):
         (*state, p_accept, _), inner_updates = kernel(
-            q, logprob, logprob_grad, at.exp(x_t)
+            q,
+            logprob,
+            logprob_grad,
+            at.exp(x_t),
+            inverse_mass_matrix,
+            num_integration_steps,
         )
         da_state = update_fn(p_accept, step, x_t, x_avg, gradient_avg, mu)
         return (*state, *da_state, p_accept), inner_updates
