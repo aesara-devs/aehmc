@@ -20,14 +20,12 @@ def test_warmup_scalar():
         logprob = joint_logprob({Y_rv: y})
         return logprob
 
-    def kernel_factory(inverse_mass_matrix: TensorVariable):
-        return nuts.new_kernel(srng, logprob_fn)
-
     y_vv = Y_rv.clone()
+    kernel = nuts.new_kernel(srng, logprob_fn)
     initial_state = nuts.new_state(y_vv, logprob_fn)
 
     state, (step_size, inverse_mass_matrix), updates = window_adaptation.run(
-        kernel_factory, initial_state, num_steps=1000
+        kernel, initial_state, num_steps=1000
     )
 
     # Compile the warmup and execute to get a value for the step size and the
@@ -42,6 +40,7 @@ def test_warmup_scalar():
 
     assert final_state[0] != 3.0  # the chain has moved
     assert np.ndim(step_size) == 0  # scalar step size
+    assert step_size != 1.0  # step size changed
     assert step_size > 0.1 and step_size < 2  # stable range for the step size
     assert np.ndim(inverse_mass_matrix) == 0  # scalar mass matrix
     assert inverse_mass_matrix == pytest.approx(4, rel=1.0)
@@ -61,14 +60,12 @@ def test_warmup_vector():
         logprob = joint_logprob({Y_rv: y})
         return logprob
 
-    def kernel_factory(inverse_mass_matrix: TensorVariable):
-        return nuts.new_kernel(srng, logprob_fn)
-
     y_vv = Y_rv.clone()
+    kernel = nuts.new_kernel(srng, logprob_fn)
     initial_state = nuts.new_state(y_vv, logprob_fn)
 
     state, (step_size, inverse_mass_matrix), updates = window_adaptation.run(
-        kernel_factory, initial_state, num_steps=1000
+        kernel, initial_state, num_steps=1000
     )
 
     # Compile the warmup and execute to get a value for the step size and the
