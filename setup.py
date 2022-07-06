@@ -17,7 +17,7 @@ setup(
     install_requires=[
         "numpy>=1.18.1",
         "scipy>=1.4.0",
-        "aesara>=2.5.0",
+        "aesara>=2.7.5",
         "aeppl>=0.0.9",
     ],
     tests_require=["pytest"],
