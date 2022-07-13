@@ -21,7 +21,7 @@ def run(
     target_acceptance_rate=0.80
 ):
 
-    init_adapt, update_adapt, final_adapt = window_adaptation(
+    init_adapt, update_adapt = window_adaptation(
         num_steps, is_mass_matrix_full, initial_step_size, target_acceptance_rate
     )
 
@@ -185,7 +185,7 @@ def window_adaptation(
 
         return (da_state, mm_state), params
 
-    return init, update, final
+    return init, update
 
 
 def build_schedule(
