@@ -71,7 +71,8 @@ def test_static_integration(example):
     "case",
     [
         (0.0000001, False, False),
-        (1000, True, True),
+        (1000, True, False),
+        (1e100, True, False),
     ],
 )
 def test_dynamic_integration(case):
@@ -136,7 +137,7 @@ def test_dynamic_integration(case):
 @pytest.mark.parametrize(
     "step_size, should_diverge, should_turn, expected_doublings",
     [
-        (100000.0, True, True, 1),
+        (100000.0, True, False, 1),
         (0.0000001, False, False, 10),
         (1.0, False, True, 1),
     ],
