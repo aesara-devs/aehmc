@@ -266,9 +266,21 @@ def dynamic_integration(
             state[1],
             0,
         )
+        full_initial_state = (
+            *proposal[0],
+            proposal[1],
+            proposal[2],
+            proposal[3],
+            *state,
+            momentum_sum,
+            *termination_state,
+            at.as_tensor(1, dtype=np.int32),
+            is_diverging,
+            np.array(False),
+        )
 
         steps = at.arange(1, 1 + max_num_steps)
-        traj, updates = aesara.scan(
+        trajectory, updates = aesara.scan(
             add_one_state,
             outputs_info=(
                 *proposal[0],
@@ -284,19 +296,28 @@ def dynamic_integration(
             ),
             sequences=steps,
         )
+        full_last_state = tuple([state[-1] for state in trajectory])
+
+        # We build the trajectory iff the first step is not diverging
+        full_state = ifelse(is_diverging, full_initial_state, full_last_state)
 
         new_proposal = (
-            (traj[0][-1], traj[1][-1], traj[2][-1], traj[3][-1]),
-            traj[4][-1],
-            traj[5][-1],
-            traj[6][-1],
+            (full_state[0], full_state[1], full_state[2], full_state[3]),
+            full_state[4],
+            full_state[5],
+            full_state[6],
         )
-        new_state = (traj[7][-1], traj[8][-1], traj[9][-1], traj[10][-1])
-        subtree_momentum_sum = traj[11][-1]
-        new_termination_state = (traj[12][-1], traj[13][-1], traj[14][-1], traj[15][-1])
-        trajectory_length = traj[-3][-1]  # defined as the number of steps taken
-        is_diverging = traj[-2][-1] | is_diverging
-        has_terminated = traj[-1][-1]
+        new_state = (full_state[7], full_state[8], full_state[9], full_state[10])
+        subtree_momentum_sum = full_state[11]
+        new_termination_state = (
+            full_state[12],
+            full_state[13],
+            full_state[14],
+            full_state[15],
+        )
+        trajectory_length = full_state[-3]
+        is_diverging = full_state[-2]
+        has_terminated = full_state[-1]
 
         return (
             new_proposal,

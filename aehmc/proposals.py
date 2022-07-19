@@ -85,7 +85,10 @@ def progressive_uniform_sampling(
     state, energy, weight, _ = proposal
     new_state, new_energy, new_weight, _ = new_proposal
 
+    # TODO: Make the `at.isnan` check unnecessary
     p_accept = at.expit(new_weight - weight)
+    p_accept = at.where(at.isnan(p_accept), 0, p_accept)
+
     do_accept = srng.bernoulli(p_accept)
     updated_proposal = maybe_update_proposal(do_accept, proposal, new_proposal)
 
