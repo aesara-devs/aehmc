@@ -6,7 +6,7 @@ from aehmc import window_adaptation
 @pytest.mark.parametrize(
     "num_steps, expected_schedule",
     [
-        (19, [(0, False)] * 18),  # no mass matrix adaptation
+        (19, [(0, False)] * 19),  # no mass matrix adaptation
         (
             100,
             [(0, False)] * 15 + [(1, False)] * 74 + [(1, True)] + [(0, False)] * 10,
@@ -24,4 +24,5 @@ from aehmc import window_adaptation
 )
 def test_adaptation_schedule(num_steps, expected_schedule):
     adaptation_schedule = window_adaptation.build_schedule(num_steps)
+    assert num_steps == len(adaptation_schedule)
     assert adaptation_schedule == expected_schedule
