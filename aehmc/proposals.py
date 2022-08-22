@@ -40,7 +40,7 @@ def proposal_generator(kinetic_energy: Callable, divergence_threshold: float):
 
         delta_energy = initial_energy - new_energy
         delta_energy = at.where(at.isnan(delta_energy), -np.inf, delta_energy)
-        is_transition_divergent = at.abs_(delta_energy) > divergence_threshold
+        is_transition_divergent = at.abs(delta_energy) > divergence_threshold
 
         weight = delta_energy
         log_p_accept = at.where(

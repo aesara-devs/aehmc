@@ -1,9 +1,9 @@
 from typing import Callable, Tuple
 
 import aesara.tensor as at
-import aesara.tensor.slinalg as slinalg
 from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.shape import shape_tuple
+from aesara.tensor.slinalg import cholesky, solve_triangular
 from aesara.tensor.var import TensorVariable
 
 
@@ -51,9 +51,9 @@ def gaussian_metric(
         dot, matmul = at.dot, lambda x, y: x * y
     elif inverse_mass_matrix.ndim == 2:
         shape = (shape_tuple(inverse_mass_matrix)[0],)
-        tril_inv = slinalg.cholesky(inverse_mass_matrix)
+        tril_inv = cholesky(inverse_mass_matrix)
         identity = at.eye(*shape)
-        mass_matrix_sqrt = slinalg.solve_lower_triangular(tril_inv, identity)
+        mass_matrix_sqrt = solve_triangular(tril_inv, identity, lower=True)
         dot, matmul = at.dot, at.dot
     else:
         raise ValueError(
