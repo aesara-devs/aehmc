@@ -4,8 +4,8 @@ from typing import Dict, Iterable, List
 import aesara.tensor as at
 from aesara.graph.basic import Variable, ancestors
 from aesara.graph.fg import FunctionGraph
-from aesara.graph.opt_utils import optimize_graph
-from aesara.tensor.basic_opt import ShapeFeature
+from aesara.graph.rewriting.utils import rewrite_graph
+from aesara.tensor.rewriting.shape import ShapeFeature
 from aesara.tensor.var import TensorVariable
 
 
@@ -16,7 +16,7 @@ def simplify_shapes(graphs: List[Variable]):
         features=[ShapeFeature()],
         clone=False,
     )
-    return optimize_graph(shape_fg).outputs
+    return rewrite_graph(shape_fg).outputs
 
 
 class RaveledParamsMap:
