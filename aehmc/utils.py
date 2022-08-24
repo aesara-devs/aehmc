@@ -5,7 +5,7 @@ import aesara.tensor as at
 from aesara.graph.basic import Variable, ancestors
 from aesara.graph.fg import FunctionGraph
 from aesara.graph.rewriting.utils import rewrite_graph
-from aesara.tensor.rewriting.basic import ShapeFeature
+from aesara.tensor.rewriting.shape import ShapeFeature
 from aesara.tensor.var import TensorVariable
 
 
