@@ -30,7 +30,7 @@ Example
 
     # Build the transition kernel
     srng = RandomStream(seed=0)
-    kernel = nuts.kernel(srng, logprob_fn)
+    kernel = nuts.new_kernel(srng, logprob_fn)
 
     # Compile a function that updates the chain
     y_vv = Y_rv.clone()
