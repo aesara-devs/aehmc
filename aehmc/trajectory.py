@@ -274,7 +274,7 @@ def dynamic_integration(
             *state,
             momentum_sum,
             *termination_state,
-            at.as_tensor(1, dtype=np.int32),
+            at.as_tensor(1, dtype=np.int64),
             is_diverging,
             np.array(False),
         )
@@ -290,7 +290,7 @@ def dynamic_integration(
                 *state,
                 momentum_sum,
                 *termination_state,
-                at.as_tensor(1, dtype=np.int32),
+                at.as_tensor(1, dtype=np.int64),
                 None,
                 None,
             ),
