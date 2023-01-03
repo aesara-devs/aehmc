@@ -25,7 +25,7 @@ Example
 
 
     def logprob_fn(y):
-        return joint_logprob({Y_rv: y})
+        return joint_logprob(realized={Y_rv: y})[0]
 
 
     # Build the transition kernel

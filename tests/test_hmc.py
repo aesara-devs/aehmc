@@ -17,7 +17,7 @@ def test_warmup_scalar():
     Y_rv = srng.normal(1, 2)
 
     def logprob_fn(y: TensorVariable):
-        logprob = joint_logprob({Y_rv: y})
+        logprob, _ = joint_logprob(realized={Y_rv: y})
         return logprob
 
     y_vv = Y_rv.clone()
@@ -57,7 +57,7 @@ def test_warmup_vector():
     Y_rv = srng.multivariate_normal(loc, cov)
 
     def logprob_fn(y: TensorVariable):
-        logprob = joint_logprob({Y_rv: y})
+        logprob, _ = joint_logprob(realized={Y_rv: y})
         return logprob
 
     y_vv = Y_rv.clone()
@@ -104,7 +104,7 @@ def test_univariate_hmc(step_size, diverges):
     Y_rv = srng.normal(1, 2)
 
     def logprob_fn(y):
-        logprob = joint_logprob({Y_rv: y})
+        logprob, _ = joint_logprob(realized={Y_rv: y})
         return logprob
 
     kernel = hmc.new_kernel(srng, logprob_fn)
@@ -162,7 +162,7 @@ def multivariate_normal_model(srng):
     Y_rv = srng.multivariate_normal(loc_tt, cov_tt)
 
     def logprob_fn(y):
-        return joint_logprob({Y_rv: y})
+        return joint_logprob(realized={Y_rv: y})[0]
 
     return (loc, scale, rho), Y_rv, logprob_fn
 
