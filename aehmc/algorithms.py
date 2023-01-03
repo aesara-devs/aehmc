@@ -57,7 +57,7 @@ def dual_averaging(
             Chosen points towards which the successive iterates are shrunk.
 
         """
-        step = at.as_tensor(1, "step", dtype=np.int32)
+        step = at.as_tensor(1, "step", dtype=np.int64)
         gradient_avg = at.as_tensor(0, "gradient_avg", dtype=config.floatX)
         x_t = at.as_tensor(0.0, "x_t", dtype=config.floatX)
         x_avg = at.as_tensor(0.0, "x_avg", dtype=config.floatX)
@@ -105,7 +105,7 @@ def dual_averaging(
         new_x_avg = x_eta * x + (1.0 - x_eta) * x_avg
 
         return (
-            (step + 1).astype(np.int32),
+            (step + 1).astype(np.int64),
             new_x.astype(config.floatX),
             new_x_avg.astype(config.floatX),
             new_gradient_avg.astype(config.floatX),
@@ -145,7 +145,7 @@ def welford_covariance(compute_covariance: bool) -> Tuple[Callable, Callable, Ca
             The number of dimensions of the problem.
 
         """
-        sample_size = at.as_tensor(0, dtype=np.int32)
+        sample_size = at.as_tensor(0, dtype=np.int64)
 
         if n_dims == 0:
             return (

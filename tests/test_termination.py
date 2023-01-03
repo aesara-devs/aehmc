@@ -48,7 +48,7 @@ def test_iterative_turning_termination(
     [(0, (1, 0)), (6, (3, 2)), (7, (0, 2)), (13, (2, 2)), (15, (0, 3))],
 )
 def test_leaf_idx_to_ckpt_idx(step, expected_idx):
-    step_tt = at.scalar("step", dtype=np.int32)
+    step_tt = at.scalar("step", dtype=np.int64)
     idx_tt = _find_storage_indices(step_tt)
     fn = aesara.function((step_tt,), (*idx_tt,))
 
@@ -73,7 +73,7 @@ def test_termination_update(num_dims):
     num_doublings = at.as_tensor(4)
     termination_state = new_state(position, num_doublings)
 
-    step = at.scalar("step", dtype=np.int32)
+    step = at.scalar("step", dtype=np.int64)
     updated = update(termination_state, momentum_sum, momentum, step)
     update_fn = aesara.function((step,), updated, on_unused_input="ignore")
 
