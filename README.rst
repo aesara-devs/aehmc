@@ -82,3 +82,8 @@ The current development branch of AeHMC can be installed from GitHub using ``pip
   :target: https://github.com/aesara-devs/aehmc/actions/workflows/test.yml
 .. |Coverage| image:: https://codecov.io/gh/aesara-devs/aehmc/branch/main/graph/badge.svg?token=L2i59LsFc0
   :target: https://codecov.io/gh/aesara-devs/aehmc
+
+
+.. image:: https://badges.gitter.im/aesara-devs/aehmc.svg
+   :alt: Join the chat at https://gitter.im/aesara-devs/aehmc
+   :target: https://gitter.im/aesara-devs/aehmc?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
