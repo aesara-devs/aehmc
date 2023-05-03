@@ -50,10 +50,12 @@ def gaussian_metric(
         mass_matrix_sqrt = at.sqrt(at.reciprocal(inverse_mass_matrix))
         dot, matmul = at.dot, lambda x, y: x * y
     elif inverse_mass_matrix.ndim == 2:
+        # inverse mass matrix can be factored into L*L.T. We want the cholesky
+        # factor (inverse of L.T) of the mass matrix.
         shape = (shape_tuple(inverse_mass_matrix)[0],)
-        tril_inv = cholesky(inverse_mass_matrix)
+        L = cholesky(inverse_mass_matrix)
         identity = at.eye(*shape)
-        mass_matrix_sqrt = solve_triangular(tril_inv, identity, lower=True)
+        mass_matrix_sqrt = solve_triangular(L, identity, lower=True, trans=True)
         dot, matmul = at.dot, at.dot
     else:
         raise ValueError(
