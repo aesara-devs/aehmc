@@ -18,7 +18,7 @@ def run(
     *,
     is_mass_matrix_full=False,
     initial_step_size=at.as_tensor(1.0, dtype=config.floatX),
-    target_acceptance_rate=0.80
+    target_acceptance_rate=0.80,
 ):
     init_adapt, update_adapt = window_adaptation(
         num_steps, is_mass_matrix_full, initial_step_size, target_acceptance_rate

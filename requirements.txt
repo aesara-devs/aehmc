@@ -1,5 +1,4 @@
 arviz
-versioneer
 -e ./
 coveralls
 pydocstyle>=3.0.0
