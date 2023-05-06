@@ -46,7 +46,6 @@ kinetic_energy_test_cases = [
 
 @pytest.mark.parametrize("case", kinetic_energy_test_cases)
 def test_gaussian_metric_kinetic_energy(case):
-
     inverse_mass_matrix_val, momentum_val, expected_energy = case
 
     if np.ndim(inverse_mass_matrix_val) == 0:
@@ -88,7 +87,6 @@ turning_test_cases = [
 
 @pytest.mark.parametrize("case", turning_test_cases)
 def test_turning(case):
-
     inverse_mass_matrix_val, p_left_val, p_right_val, p_sum_val = case
 
     if np.ndim(inverse_mass_matrix_val) == 0:

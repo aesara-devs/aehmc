@@ -11,7 +11,6 @@ from aehmc import mass_matrix
 @pytest.mark.parametrize("is_full_matrix", [True, False])
 @pytest.mark.parametrize("n_dims", [0, 1, 3])
 def test_mass_matrix_adaptation(is_full_matrix, n_dims):
-
     srng = RandomStream(seed=0)
 
     if n_dims > 0:
