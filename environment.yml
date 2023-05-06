@@ -7,7 +7,7 @@ name: aehmc-dev
 channels:
   - conda-forge
 dependencies:
-  - python
+  - python>=3.8
   - compilers
   - numpy>=1.18.1
   - scipy>=1.4.0
