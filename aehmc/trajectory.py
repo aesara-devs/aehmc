@@ -422,7 +422,6 @@ def multiplicative_expansion(
             idx_min,
             idx_max,
         ):
-
             left_state = (
                 q_left,
                 p_left,
