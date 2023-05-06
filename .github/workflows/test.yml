@@ -100,7 +100,7 @@ jobs:
       - name: Install dependencies
         shell: bash -l {0}
         run: |
-          mamba install --yes -q "python~=${PYTHON_VERSION}=*_cpython" mkl numpy scipy pip mkl-service "aesara>=2.5.0"
+          mamba install --yes -q "python~=${PYTHON_VERSION}=*_cpython" mkl numpy scipy pip mkl-service "aesara>=2.8.11"
           pip install -q -r requirements.txt
           mamba list && pip freeze
           python -c 'import aesara; print(aesara.config.__str__(print_doc=False))'
