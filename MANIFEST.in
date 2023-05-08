@@ -1,2 +1,8 @@
-include versioneer.py
-include aehmc/_version.py
+prune .github
+prune examples
+exclude *.yaml
+exclude *.yml
+exclude .git*
+exclude *.py
+exclude *rc
+exclude .flake8
