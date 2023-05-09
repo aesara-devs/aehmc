@@ -6,6 +6,8 @@ from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
 
 from aehmc import hmc, integrators, metrics
+from aehmc.integrators import IntegratorState
+from aehmc.proposals import ProposalState
 from aehmc.termination import iterative_uturn
 from aehmc.trajectory import dynamic_integration, multiplicative_expansion
 
@@ -111,14 +113,14 @@ def new_kernel(
         )
 
         p = momentum_generator(srng)
-        initial_state = (q, p, potential_energy, potential_energy_grad)
+        initial_state = IntegratorState(q, p, potential_energy, potential_energy_grad)
         initial_termination_state = new_termination_state(q, max_num_expansions)
         initial_energy = potential_energy + kinetic_energy_fn(p)
-        initial_proposal = (
-            initial_state,
-            initial_energy,
-            at.as_tensor(0.0, dtype=np.float64),
-            at.as_tensor(-np.inf, dtype=np.float64),
+        initial_proposal = ProposalState(
+            state=initial_state,
+            energy=initial_energy,
+            weight=at.as_tensor(0.0, dtype=np.float64),
+            sum_log_p_accept=at.as_tensor(-np.inf, dtype=np.float64),
         )
         result, updates = expand(
             initial_proposal,

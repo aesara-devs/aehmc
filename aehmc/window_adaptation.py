@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import aesara
 import aesara.tensor as at
@@ -7,19 +7,21 @@ from aesara.ifelse import ifelse
 from aesara.tensor.shape import shape_tuple
 from aesara.tensor.var import TensorVariable
 
+from aehmc.algorithms import DualAveragingState
+from aehmc.integrators import IntegratorState
 from aehmc.mass_matrix import covariance_adaptation
 from aehmc.step_size import dual_averaging_adaptation
 
 
 def run(
     kernel,
-    initial_state,
+    initial_state: IntegratorState,
     num_steps=1000,
     *,
     is_mass_matrix_full=False,
     initial_step_size=at.as_tensor(1.0, dtype=config.floatX),
     target_acceptance_rate=0.80,
-):
+) -> Tuple[IntegratorState, Tuple[TensorVariable, TensorVariable], Dict]:
     init_adapt, update_adapt = window_adaptation(
         num_steps, is_mass_matrix_full, initial_step_size, target_acceptance_rate
     )
@@ -42,7 +44,13 @@ def run(
     ):
         chain_state = (q, potential_energy, potential_energy_grad)
         warmup_state = (
-            (step, log_step_size, log_step_size_avg, gradient_avg, mu),
+            DualAveragingState(
+                step=step,
+                iterates=log_step_size,
+                iterates_avg=log_step_size_avg,
+                gradient_avg=gradient_avg,
+                shrinkage_pts=mu,
+            ),
             (mean, m2, sample_size),
         )
         parameters = (step_size, inverse_mass_matrix)
@@ -54,12 +62,16 @@ def run(
         warmup_state, parameters = update_adapt(
             warmup_step, warmup_state, parameters, chain_state
         )
-
+        da_state = warmup_state[0]
         return (
             chain_state[0],  # q
             chain_state[1],  # potential_energy
             chain_state[2],  # potential_energy_grad
-            *warmup_state[0],
+            da_state.step,
+            da_state.iterates,  # log_step_size
+            da_state.iterates_avg,  # log_step_size_avg
+            da_state.gradient_avg,
+            da_state.shrinkage_pts,  # mu
             *warmup_state[1],
             *parameters,
         ), inner_updates
@@ -69,12 +81,28 @@ def run(
     warmup_steps = at.arange(0, num_steps)
     state, updates = aesara.scan(
         fn=one_step,
-        outputs_info=(*initial_state, *da_state, *mm_state, *parameters),
+        outputs_info=(
+            initial_state.position,
+            initial_state.potential_energy,
+            initial_state.potential_energy_grad,
+            da_state.step,
+            da_state.iterates,  # log_step_size
+            da_state.iterates_avg,  # log_step_size_avg
+            da_state.gradient_avg,
+            da_state.shrinkage_pts,  # mu
+            *mm_state,
+            *parameters,
+        ),
         sequences=(warmup_steps,),
         name="window_adaptation",
     )
 
-    last_chain_state = (state[0][-1], state[1][-1], state[2][-1])
+    last_chain_state = IntegratorState(
+        position=state[0][-1],
+        momentum=None,
+        potential_energy=state[1][-1],
+        potential_energy_grad=state[2][-1],
+    )
     step_size = state[-2][-1]
     inverse_mass_matrix = state[-1][-1]
 
@@ -94,15 +122,15 @@ def window_adaptation(
     schedule_stage = at.as_tensor([s[0] for s in schedule])
     schedule_middle_window = at.as_tensor([s[1] for s in schedule])
 
-    def init(initial_chain_state: Tuple):
-        if initial_chain_state[0].ndim == 0:
+    def init(initial_chain_state: IntegratorState):
+        if initial_chain_state.position.ndim == 0:
             num_dims = 0
         else:
-            num_dims = shape_tuple(initial_chain_state[0])[0]
+            num_dims = shape_tuple(initial_chain_state.position)[0]
         inverse_mass_matrix, mm_state = mm_init(num_dims)
 
         da_state = da_init(initial_step_size)
-        step_size = at.exp(da_state[1])
+        step_size = at.exp(da_state.iterates)
 
         warmup_state = (da_state, mm_state)
         parameters = (step_size, inverse_mass_matrix)
@@ -112,8 +140,8 @@ def window_adaptation(
         da_state, mm_state = warmup_state
         _, inverse_mass_matrix = parameters
 
-        new_da_state = da_update(p_accept, *da_state)
-        step_size = at.exp(new_da_state[1])
+        new_da_state = da_update(p_accept, da_state)
+        step_size = at.exp(new_da_state.iterates)
 
         return (new_da_state, mm_state), (step_size, inverse_mass_matrix)
 
@@ -121,9 +149,9 @@ def window_adaptation(
         da_state, mm_state = warmup_state
         _, inverse_mass_matrix = parameters
 
-        new_da_state = da_update(p_accept, *da_state)
+        new_da_state = da_update(p_accept, da_state)
         new_mm_state = mm_update(position, mm_state)
-        step_size = at.exp(new_da_state[1])
+        step_size = at.exp(new_da_state.iterates)
 
         return (new_da_state, new_mm_state), (step_size, inverse_mass_matrix)
 
@@ -139,7 +167,7 @@ def window_adaptation(
             num_dims = shape_tuple(inverse_mass_matrix)[0]
         _, new_mm_state = mm_init(num_dims)
 
-        step_size = at.exp(da_state[1])
+        step_size = at.exp(da_state.iterates)
         new_da_state = da_init(step_size)
 
         warmup_state = (new_da_state, new_mm_state)
@@ -151,7 +179,7 @@ def window_adaptation(
     ) -> Tuple[TensorVariable, TensorVariable]:
         da_state, _ = warmup_state
         _, inverse_mass_matrix = parameters
-        step_size = at.exp(da_state[2])  # return stepsize_avg at the end
+        step_size = at.exp(da_state.iterates_avg)  # return stepsize_avg at the end
         return step_size, inverse_mass_matrix
 
     def update(step: int, warmup_state: Tuple, parameters: Tuple, chain_state: Tuple):
@@ -182,7 +210,7 @@ def window_adaptation(
         mm_state = ifelse(do_pick_left, left_mm_state, right_mm_state)
         params = ifelse(do_pick_left, left_params, right_params)
 
-        return (da_state, mm_state), params
+        return (DualAveragingState(*da_state), mm_state), params
 
     return init, update
 

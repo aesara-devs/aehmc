@@ -6,10 +6,11 @@ from aeppl.logprob import logprob
 from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
 
-from aehmc.integrators import new_integrator_state, velocity_verlet
+from aehmc.integrators import IntegratorState, new_integrator_state, velocity_verlet
 from aehmc.metrics import gaussian_metric
 from aehmc.termination import iterative_uturn
 from aehmc.trajectory import (
+    ProposalState,
     dynamic_integration,
     multiplicative_expansion,
     static_integration,
@@ -58,7 +59,13 @@ def test_static_integration(example):
     p = at.vector("p")
     energy = potential(q)
     energy_grad = aesara.grad(energy, q)
-    final_state, updates = integrator(q, p, energy, energy_grad, step_size)
+    init_state = IntegratorState(
+        position=q,
+        momentum=p,
+        potential_energy=energy,
+        potential_energy_grad=energy_grad,
+    )
+    final_state, updates = integrator(init_state, step_size)
     integrate_fn = aesara.function((q, p), final_state, updates=updates)
 
     q_final, p_final, *_ = integrate_fn(q_init, p_init)
@@ -177,16 +184,16 @@ def test_multiplicative_expansion(
 
     # Create the initial state
     state = new_integrator_state(potential_fn, position, momentum_generator(srng))
-    energy = state[2] + kinetic_energy_fn(state[1])
-    proposal = (
-        state,
-        energy,
-        at.as_tensor(0.0, dtype=np.float64),
-        at.as_tensor(-np.inf, dtype=np.float64),
+    energy = state.potential_energy + kinetic_energy_fn(state.momentum)
+    proposal = ProposalState(
+        state=state,
+        energy=energy,
+        weight=at.as_tensor(0.0, dtype=np.float64),
+        sum_log_p_accept=at.as_tensor(-np.inf, dtype=np.float64),
     )
-    termination_state = new_criterion_state(state[0], 10)
+    termination_state = new_criterion_state(state.position, 10)
     result, updates = expand(
-        proposal, state, state, state[1], termination_state, energy, step_size
+        proposal, state, state, state.momentum, termination_state, energy, step_size
     )
     fn = aesara.function((), result, updates=updates)
     result = fn()

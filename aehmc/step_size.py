@@ -74,13 +74,8 @@ def dual_averaging_adaptation(
     da_init, da_update = algorithms.dual_averaging(gamma, t0, kappa)
 
     def update(
-        acceptance_probability: TensorVariable,
-        step: TensorVariable,
-        log_step_size: TensorVariable,
-        log_step_size_avg: TensorVariable,
-        gradient_avg: TensorVariable,
-        mu: TensorVariable,
-    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable, TensorVariable]:
+        acceptance_probability: TensorVariable, state: algorithms.DualAveragingState
+    ) -> algorithms.DualAveragingState:
         """Update the dual averaging adaptation state.
 
         Parameters
@@ -100,8 +95,6 @@ def dual_averaging_adaptation(
 
         """
         gradient = target_acceptance_rate - acceptance_probability
-        return da_update(
-            gradient, step, log_step_size, log_step_size_avg, gradient_avg, mu
-        )
+        return da_update(gradient, state)
 
     return da_init, update

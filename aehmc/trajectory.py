@@ -8,9 +8,9 @@ from aesara.scan.utils import until
 from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
 
-from aehmc.integrators import IntegratorStateType
+from aehmc.integrators import IntegratorState
 from aehmc.proposals import (
-    ProposalStateType,
+    ProposalState,
     progressive_biased_sampling,
     progressive_uniform_sampling,
     proposal_generator,
@@ -53,12 +53,8 @@ def static_integration(
     """
 
     def integrate(
-        q_init: TensorVariable,
-        p_init: TensorVariable,
-        energy_init: TensorVariable,
-        energy_grad_init: TensorVariable,
-        step_size: TensorVariable,
-    ) -> Tuple[IntegratorStateType, Dict]:
+        init_state: IntegratorState, step_size: TensorVariable
+    ) -> Tuple[IntegratorState, Dict]:
         """Generate a trajectory by integrating several times in one direction.
 
         Parameters
@@ -85,22 +81,31 @@ def static_integration(
 
         def one_step(q, p, potential_energy, potential_energy_grad):
             new_state = integrator(
-                q, p, potential_energy, potential_energy_grad, step_size
+                IntegratorState(q, p, potential_energy, potential_energy_grad),
+                step_size,
             )
             return new_state
 
         [q, p, energy, energy_grad], updates = aesara.scan(
             fn=one_step,
             outputs_info=[
-                {"initial": q_init},
-                {"initial": p_init},
-                {"initial": energy_init},
-                {"initial": energy_grad_init},
+                {"initial": init_state.position},
+                {"initial": init_state.momentum},
+                {"initial": init_state.potential_energy},
+                {"initial": init_state.potential_energy_grad},
             ],
             n_steps=num_integration_steps,
         )
 
-        return (q[-1], p[-1], energy[-1], energy_grad[-1]), updates
+        return (
+            IntegratorState(
+                position=q[-1],
+                momentum=p[-1],
+                potential_energy=energy[-1],
+                potential_energy_grad=energy_grad[-1],
+            ),
+            updates,
+        )
 
     return integrate
 
@@ -150,7 +155,7 @@ def dynamic_integration(
     sample_proposal = progressive_uniform_sampling
 
     def integrate(
-        previous_last_state: IntegratorStateType,
+        previous_last_state: IntegratorState,
         direction: TensorVariable,
         termination_state: TerminationStateType,
         max_num_steps: TensorVariable,
@@ -210,45 +215,51 @@ def dynamic_integration(
             idx_max,
             trajectory_length,
         ):
-            state = (
-                q_last,
-                p_last,
-                potential_energy_last,
-                potential_energy_grad_last,
-            )
             termination_state = (momentum_ckpts, momentum_sum_ckpts, idx_min, idx_max)
-            proposal = (
-                (
-                    q_proposal,
-                    p_proposal,
-                    potential_energy_proposal,
-                    potential_energy_grad_proposal,
+            proposal = ProposalState(
+                state=IntegratorState(
+                    position=q_proposal,
+                    momentum=p_proposal,
+                    potential_energy=potential_energy_proposal,
+                    potential_energy_grad=potential_energy_grad_proposal,
                 ),
-                energy_proposal,
-                weight,
-                sum_p_accept,
+                energy=energy_proposal,
+                weight=weight,
+                sum_log_p_accept=sum_p_accept,
+            )
+            last_state = IntegratorState(
+                position=q_last,
+                momentum=p_last,
+                potential_energy=potential_energy_last,
+                potential_energy_grad=potential_energy_grad_last,
             )
 
-            new_state = integrator(*state, direction * step_size)
+            new_state = integrator(last_state, direction * step_size)
             new_proposal, is_diverging = generate_proposal(initial_energy, new_state)
             sampled_proposal = sample_proposal(srng, proposal, new_proposal)
 
-            new_momentum_sum = momentum_sum + new_state[1]
+            new_momentum_sum = momentum_sum + new_state.momentum
             new_termination_state = update_termination_state(
-                termination_state, new_momentum_sum, new_state[1], step
+                termination_state, new_momentum_sum, new_state.momentum, step
             )
             has_terminated = is_criterion_met(
-                new_termination_state, new_momentum_sum, new_state[1]
+                new_termination_state, new_momentum_sum, new_state.momentum
             )
 
             do_stop_integrating = is_diverging | has_terminated
 
             return (
-                *sampled_proposal[0],
-                sampled_proposal[1],
-                sampled_proposal[2],
-                sampled_proposal[3],
-                *new_state,
+                sampled_proposal.state.position,
+                sampled_proposal.state.momentum,
+                sampled_proposal.state.potential_energy,
+                sampled_proposal.state.potential_energy_grad,
+                sampled_proposal.energy,
+                sampled_proposal.weight,
+                sampled_proposal.sum_log_p_accept,
+                new_state.position,
+                new_state.momentum,
+                new_state.potential_energy,
+                new_state.potential_energy_grad,
                 new_momentum_sum,
                 *new_termination_state,
                 trajectory_length + 1,
@@ -257,21 +268,27 @@ def dynamic_integration(
             ), until(do_stop_integrating)
 
         # We take one step away to start building the subtrajectory
-        state = integrator(*previous_last_state, direction * step_size)
+        state = integrator(previous_last_state, direction * step_size)
         proposal, is_diverging = generate_proposal(initial_energy, state)
-        momentum_sum = state[1]
+        momentum_sum = state.momentum
         termination_state = update_termination_state(
             termination_state,
             momentum_sum,
-            state[1],
+            state.momentum,
             0,
         )
         full_initial_state = (
-            *proposal[0],
-            proposal[1],
-            proposal[2],
-            proposal[3],
-            *state,
+            proposal.state.position,
+            proposal.state.momentum,
+            proposal.state.potential_energy,
+            proposal.state.potential_energy_grad,
+            proposal.energy,
+            proposal.weight,
+            proposal.sum_log_p_accept,
+            state.position,
+            state.momentum,
+            state.potential_energy,
+            state.potential_energy_grad,
             momentum_sum,
             *termination_state,
             at.as_tensor(1, dtype=np.int64),
@@ -283,11 +300,17 @@ def dynamic_integration(
         trajectory, updates = aesara.scan(
             add_one_state,
             outputs_info=(
-                *proposal[0],
-                proposal[1],
-                proposal[2],
-                proposal[3],
-                *state,
+                proposal.state.position,
+                proposal.state.momentum,
+                proposal.state.potential_energy,
+                proposal.state.potential_energy_grad,
+                proposal.energy,
+                proposal.weight,
+                proposal.sum_log_p_accept,
+                state.position,
+                state.momentum,
+                state.potential_energy,
+                state.potential_energy_grad,
                 momentum_sum,
                 *termination_state,
                 at.as_tensor(1, dtype=np.int64),
@@ -296,18 +319,28 @@ def dynamic_integration(
             ),
             sequences=steps,
         )
-        full_last_state = tuple([state[-1] for state in trajectory])
+        full_last_state = tuple([_state[-1] for _state in trajectory])
 
         # We build the trajectory iff the first step is not diverging
         full_state = ifelse(is_diverging, full_initial_state, full_last_state)
 
-        new_proposal = (
-            (full_state[0], full_state[1], full_state[2], full_state[3]),
-            full_state[4],
-            full_state[5],
-            full_state[6],
+        new_proposal = ProposalState(
+            state=IntegratorState(
+                position=full_state[0],
+                momentum=full_state[1],
+                potential_energy=full_state[2],
+                potential_energy_grad=full_state[3],
+            ),
+            energy=full_state[4],
+            weight=full_state[5],
+            sum_log_p_accept=full_state[6],
         )
-        new_state = (full_state[7], full_state[8], full_state[9], full_state[10])
+        new_state = IntegratorState(
+            position=full_state[7],
+            momentum=full_state[8],
+            potential_energy=full_state[9],
+            potential_energy_grad=full_state[10],
+        )
         subtree_momentum_sum = full_state[11]
         new_termination_state = (
             full_state[12],
@@ -365,9 +398,9 @@ def multiplicative_expansion(
     proposal_sampler = progressive_biased_sampling
 
     def expand(
-        proposal,
-        left_state,
-        right_state,
+        proposal: ProposalState,
+        left_state: IntegratorState,
+        right_state: IntegratorState,
         momentum_sum,
         termination_state,
         initial_energy,
@@ -434,16 +467,16 @@ def multiplicative_expansion(
                 potential_energy_right,
                 potential_energy_grad_right,
             )
-            proposal = (
-                (
-                    q_proposal,
-                    p_proposal,
-                    potential_energy_proposal,
-                    potential_energy_grad_proposal,
+            proposal = ProposalState(
+                state=IntegratorState(
+                    position=q_proposal,
+                    momentum=p_proposal,
+                    potential_energy=potential_energy_proposal,
+                    potential_energy_grad=potential_energy_grad_proposal,
                 ),
-                energy_proposal,
-                weight,
-                sum_p_accept,
+                energy=energy_proposal,
+                weight=weight,
+                sum_log_p_accept=sum_p_accept,
             )
             termination_state = (
                 momentum_ckpts,
@@ -454,7 +487,7 @@ def multiplicative_expansion(
 
             do_go_right = srng.bernoulli(0.5)
             direction = at.where(do_go_right, 1.0, -1.0)
-            start_state = ifelse(do_go_right, right_state, left_state)
+            start_state = IntegratorState(*ifelse(do_go_right, right_state, left_state))
 
             (
                 new_proposal,
@@ -476,25 +509,30 @@ def multiplicative_expansion(
             # Update the trajectory.
             # The trajectory integrator always integrates forward in time; we
             # thus need to switch the states if the other direction was picked.
-            new_left_state = ifelse(do_go_right, left_state, new_state)
-            new_right_state = ifelse(do_go_right, new_state, right_state)
+            new_left_state = IntegratorState(
+                *ifelse(do_go_right, left_state, new_state)
+            )
+            new_right_state = IntegratorState(
+                *ifelse(do_go_right, new_state, right_state)
+            )
             new_momentum_sum = momentum_sum + subtree_momentum_sum
 
             # Compute the pseudo-acceptance probability for the NUTS algorithm.
             # It can be understood as the average acceptance probability MC would give to
             # the states explored during the final expansion.
-            acceptance_probability = at.exp(new_proposal[3]) / subtrajectory_length
+            acceptance_probability = (
+                at.exp(new_proposal.sum_log_p_accept) / subtrajectory_length
+            )
 
             # Update the proposal
             #
             # We do not accept proposals that come from diverging or turning subtrajectories.
             # However the definition of the acceptance probability is such that the
             # acceptance probability needs to be computed across the entire trajectory.
-            updated_proposal = (
-                proposal[0],
-                proposal[1],
-                proposal[2],
-                at.logaddexp(new_proposal[3], proposal[3]),
+            updated_proposal = proposal._replace(
+                sum_log_p_accept=at.logaddexp(
+                    new_proposal.sum_log_p_accept, proposal.sum_log_p_accept
+                )
             )
 
             sampled_proposal = where_proposal(
@@ -506,18 +544,27 @@ def multiplicative_expansion(
             # Check if the trajectory is turning and determine whether we need
             # to stop expanding the trajectory.
             is_turning = uturn_check_fn(
-                new_left_state[1], new_right_state[1], new_momentum_sum
+                new_left_state.momentum, new_right_state.momentum, new_momentum_sum
             )
             do_stop_expanding = is_diverging | is_turning | has_subtree_terminated
 
             return (
                 (
-                    *sampled_proposal[0],
-                    sampled_proposal[1],
-                    sampled_proposal[2],
-                    sampled_proposal[3],
-                    *new_left_state,
-                    *new_right_state,
+                    sampled_proposal.state.position,
+                    sampled_proposal.state.momentum,
+                    sampled_proposal.state.potential_energy,
+                    sampled_proposal.state.potential_energy_grad,
+                    sampled_proposal.energy,
+                    sampled_proposal.weight,
+                    sampled_proposal.sum_log_p_accept,
+                    new_left_state.position,
+                    new_left_state.momentum,
+                    new_left_state.potential_energy,
+                    new_left_state.potential_energy_grad,
+                    new_right_state.position,
+                    new_right_state.momentum,
+                    new_right_state.potential_energy,
+                    new_right_state.potential_energy_grad,
                     new_momentum_sum,
                     *new_termination_state,
                     acceptance_probability,
@@ -533,12 +580,21 @@ def multiplicative_expansion(
         results, updates = aesara.scan(
             expand_once,
             outputs_info=(
-                *proposal[0],
-                proposal[1],
-                proposal[2],
-                proposal[3],
-                *left_state,
-                *right_state,
+                proposal.state.position,
+                proposal.state.momentum,
+                proposal.state.potential_energy,
+                proposal.state.potential_energy_grad,
+                proposal.energy,
+                proposal.weight,
+                proposal.sum_log_p_accept,
+                left_state.position,
+                left_state.momentum,
+                left_state.potential_energy,
+                left_state.potential_energy_grad,
+                right_state.position,
+                right_state.momentum,
+                right_state.potential_energy,
+                right_state.potential_energy_grad,
                 momentum_sum,
                 *termination_state,
                 None,
@@ -556,18 +612,20 @@ def multiplicative_expansion(
 
 def where_proposal(
     do_pick_left: bool,
-    left_proposal: ProposalStateType,
-    right_proposal: ProposalStateType,
-) -> ProposalStateType:
+    left_proposal: ProposalState,
+    right_proposal: ProposalState,
+) -> ProposalState:
     """Represents a switch between two proposals depending on a condition."""
-    left_state, left_weight, left_energy, left_log_sum_p_accept = left_proposal
-    right_state, right_weight, right_energy, right_log_sum_p_accept = right_proposal
-
-    state = ifelse(do_pick_left, left_state, right_state)
-    energy = at.where(do_pick_left, left_energy, right_energy)
-    weight = at.where(do_pick_left, left_weight, right_weight)
+    state = ifelse(do_pick_left, left_proposal.state, right_proposal.state)
+    energy = at.where(do_pick_left, left_proposal.energy, right_proposal.energy)
+    weight = at.where(do_pick_left, left_proposal.weight, right_proposal.weight)
     log_sum_p_accept = ifelse(
-        do_pick_left, left_log_sum_p_accept, right_log_sum_p_accept
+        do_pick_left, left_proposal.sum_log_p_accept, right_proposal.sum_log_p_accept
     )
 
-    return (state, energy, weight, log_sum_p_accept)
+    return ProposalState(
+        state=IntegratorState(*state),
+        energy=energy,
+        weight=weight,
+        sum_log_p_accept=log_sum_p_accept,
+    )
