@@ -1,29 +1,29 @@
-from typing import Callable, Tuple
+from typing import Callable, NamedTuple
 
 import aesara
 from aesara.tensor.var import TensorVariable
 
-IntegratorStateType = Tuple[
-    TensorVariable, TensorVariable, TensorVariable, TensorVariable
-]
+
+class IntegratorState(NamedTuple):
+    position: TensorVariable
+    momentum: TensorVariable
+    potential_energy: TensorVariable
+    potential_energy_grad: TensorVariable
 
 
 def new_integrator_state(
     potential_fn: Callable, position: TensorVariable, momentum: TensorVariable
-):
+) -> IntegratorState:
     """Create a new integrator state from the current values of the position and momentum."""
     potential_energy = potential_fn(position)
     potential_energy_grad = aesara.grad(potential_energy, position)
-    return (position, momentum, potential_energy, potential_energy_grad)
+    return IntegratorState(position, momentum, potential_energy, potential_energy_grad)
 
 
 def velocity_verlet(
     potential_fn: Callable[[TensorVariable], TensorVariable],
     kinetic_energy_fn: Callable[[TensorVariable], TensorVariable],
-) -> Callable[
-    [TensorVariable, TensorVariable, TensorVariable, TensorVariable, TensorVariable],
-    IntegratorStateType,
-]:
+) -> Callable[[IntegratorState, TensorVariable], IntegratorState]:
     """The velocity Verlet (or Verlet-Störmer) integrator.
 
     The velocity Verlet is a two-stage palindromic integrator [1]_ of the form
@@ -51,27 +51,21 @@ def velocity_verlet(
     b1 = 0.5
     a2 = 1 - 2 * a1
 
-    def one_step(
-        position: TensorVariable,
-        momentum: TensorVariable,
-        potential_energy: TensorVariable,
-        potential_energy_grad: TensorVariable,
-        step_size: TensorVariable,
-    ) -> IntegratorStateType:
-        momentum = momentum - b1 * step_size * potential_energy_grad
+    def one_step(state: IntegratorState, step_size: TensorVariable) -> IntegratorState:
+        momentum = state.momentum - b1 * step_size * state.potential_energy_grad
 
         kinetic_grad = aesara.grad(kinetic_energy_fn(momentum), momentum)
-        position = position + a2 * step_size * kinetic_grad
+        position = state.position + a2 * step_size * kinetic_grad
 
         potential_energy = potential_fn(position)
         potential_energy_grad = aesara.grad(potential_energy, position)
         momentum = momentum - b1 * step_size * potential_energy_grad
 
-        return (
-            position,
-            momentum,
-            potential_energy,
-            potential_energy_grad,
+        return IntegratorState(
+            position=position,
+            momentum=momentum,
+            potential_energy=potential_energy,
+            potential_energy_grad=potential_energy_grad,
         )
 
     return one_step

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from aesara.tensor.var import TensorVariable
 
-from aehmc.integrators import velocity_verlet
+from aehmc.integrators import IntegratorState, velocity_verlet
 
 
 def HarmonicOscillator(inverse_mass_matrix, k=1.0, m=1.0):
@@ -115,7 +115,10 @@ def test_velocity_verlet(example):
     energy_at = potential(q) + kinetic_energy(p)
     energy_fn = aesara.function((q, p), energy_at)
 
-    integrate_fn = create_integrate_fn(potential, step, example["n_steps"])
+    def wrapped_step(pos, mom, energy, energy_grad, step_size):
+        return step(IntegratorState(pos, mom, energy, energy_grad), step_size)
+
+    integrate_fn = create_integrate_fn(potential, wrapped_step, example["n_steps"])
     q_final, p_final, energy_final, _ = integrate_fn(q_init, p_init, step_size)
 
     # Check that the trajectory was correctly integrated

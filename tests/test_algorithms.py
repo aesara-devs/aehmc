@@ -18,19 +18,33 @@ def test_dual_averaging():
     def one_step(step, x, x_avg, gradient_avg, mu):
         value = fn(x)
         gradient = aesara.grad(value, x)
-        return update(gradient, step, x, x_avg, gradient_avg, mu)
+        current_state = algorithms.DualAveragingState(
+            step=step,
+            iterates=x,
+            iterates_avg=x_avg,
+            gradient_avg=gradient_avg,
+            shrinkage_pts=mu,
+        )
+        da_state = update(gradient, current_state)
+        return (
+            da_state.step,
+            da_state.iterates,
+            da_state.iterates_avg,
+            da_state.gradient_avg,
+            da_state.shrinkage_pts,
+        )
 
-    mu = at.as_tensor(at.constant(0.5), dtype=config.floatX)
-    step, x_init, x_avg, gradient_avg, mu = init(mu)
+    shrinkage_pts = at.as_tensor(at.constant(0.5), dtype=config.floatX)
+    da_state = init(shrinkage_pts)
 
     states, updates = aesara.scan(
         fn=one_step,
         outputs_info=[
-            {"initial": step},
-            {"initial": x_init},
-            {"initial": x_avg},
-            {"initial": gradient_avg},
-            {"initial": mu},
+            {"initial": da_state.step},
+            {"initial": da_state.iterates},
+            {"initial": da_state.iterates_avg},
+            {"initial": da_state.gradient_avg},
+            {"initial": da_state.shrinkage_pts},
         ],
         n_steps=100,
     )

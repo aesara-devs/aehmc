@@ -1,19 +1,22 @@
-from typing import Callable, Tuple
+from typing import Callable, NamedTuple, Tuple
 
 import aesara.tensor as at
 import numpy as np
 from aesara.tensor.random.utils import RandomStream
 from aesara.tensor.var import TensorVariable
 
-from aehmc.integrators import IntegratorStateType
+from aehmc.integrators import IntegratorState
 
-ProposalStateType = Tuple[
-    IntegratorStateType, TensorVariable, TensorVariable, TensorVariable
-]
+
+class ProposalState(NamedTuple):
+    state: IntegratorState
+    energy: TensorVariable
+    weight: TensorVariable
+    sum_log_p_accept: TensorVariable
 
 
 def proposal_generator(kinetic_energy: Callable, divergence_threshold: float):
-    def update(initial_energy, state):
+    def update(initial_energy, state: IntegratorState) -> Tuple[ProposalState, bool]:
         """Generate a new proposal from a trajectory state.
 
         The trajectory state records information about the position in the state
@@ -35,8 +38,7 @@ def proposal_generator(kinetic_energy: Callable, divergence_threshold: float):
         whether the current transition is divergent.
 
         """
-        q, p, potential_energy, _ = state
-        new_energy = potential_energy + kinetic_energy(p)
+        new_energy = state.potential_energy + kinetic_energy(state.momentum)
 
         delta_energy = initial_energy - new_energy
         delta_energy = at.where(at.isnan(delta_energy), -np.inf, delta_energy)
@@ -49,7 +51,15 @@ def proposal_generator(kinetic_energy: Callable, divergence_threshold: float):
             delta_energy,
         )
 
-        return (state, new_energy, weight, log_p_accept), is_transition_divergent
+        return (
+            ProposalState(
+                state=state,
+                energy=new_energy,
+                weight=weight,
+                sum_log_p_accept=log_p_accept,
+            ),
+            is_transition_divergent,
+        )
 
     return update
 
@@ -60,8 +70,8 @@ def proposal_generator(kinetic_energy: Callable, divergence_threshold: float):
 
 
 def progressive_uniform_sampling(
-    srng: RandomStream, proposal: ProposalStateType, new_proposal: ProposalStateType
-) -> ProposalStateType:
+    srng: RandomStream, proposal: ProposalState, new_proposal: ProposalState
+) -> ProposalState:
     """Uniform proposal sampling.
 
     Choose between the current proposal and the proposal built from the last
@@ -82,11 +92,8 @@ def progressive_uniform_sampling(
     Either the current or the new proposal.
 
     """
-    state, energy, weight, _ = proposal
-    new_state, new_energy, new_weight, _ = new_proposal
-
     # TODO: Make the `at.isnan` check unnecessary
-    p_accept = at.expit(new_weight - weight)
+    p_accept = at.expit(new_proposal.weight - proposal.weight)
     p_accept = at.where(at.isnan(p_accept), 0, p_accept)
 
     do_accept = srng.bernoulli(p_accept)
@@ -96,8 +103,8 @@ def progressive_uniform_sampling(
 
 
 def progressive_biased_sampling(
-    srng: RandomStream, proposal: ProposalStateType, new_proposal: ProposalStateType
-) -> ProposalStateType:
+    srng: RandomStream, proposal: ProposalState, new_proposal: ProposalState
+) -> ProposalState:
     """Baised proposal sampling.
 
     Choose between the current proposal and the proposal built from the last
@@ -120,10 +127,7 @@ def progressive_biased_sampling(
     Either the current or the new proposal.
 
     """
-    state, energy, weight, _ = proposal
-    new_state, new_energy, new_weight, _ = new_proposal
-
-    p_accept = at.clip(at.exp(new_weight - weight), 0.0, 1.0)
+    p_accept = at.clip(at.exp(new_proposal.weight - proposal.weight), 0.0, 1.0)
     do_accept = srng.bernoulli(p_accept)
     updated_proposal = maybe_update_proposal(do_accept, proposal, new_proposal)
 
@@ -131,24 +135,40 @@ def progressive_biased_sampling(
 
 
 def maybe_update_proposal(
-    do_accept: bool, proposal: ProposalStateType, new_proposal: ProposalStateType
-) -> ProposalStateType:
+    do_accept: bool, proposal: ProposalState, new_proposal: ProposalState
+) -> ProposalState:
     """Return either proposal depending on the boolean `do_accept`"""
-    state, energy, weight, log_sum_p_accept = proposal
-    new_state, new_energy, new_weight, new_log_sum_p_accept = new_proposal
+    updated_weight = at.logaddexp(proposal.weight, new_proposal.weight)
+    updated_log_sum_p_accept = at.logaddexp(
+        proposal.sum_log_p_accept, new_proposal.sum_log_p_accept
+    )
 
-    updated_weight = at.logaddexp(weight, new_weight)
-    updated_log_sum_p_accept = at.logaddexp(log_sum_p_accept, new_log_sum_p_accept)
+    updated_q = at.where(
+        do_accept, new_proposal.state.position, proposal.state.position
+    )
+    updated_p = at.where(
+        do_accept, new_proposal.state.momentum, proposal.state.momentum
+    )
+    updated_potential_energy = at.where(
+        do_accept, new_proposal.state.potential_energy, proposal.state.potential_energy
+    )
+    updated_potential_energy_grad = at.where(
+        do_accept,
+        new_proposal.state.potential_energy_grad,
+        proposal.state.potential_energy_grad,
+    )
+    updated_energy = at.where(do_accept, new_proposal.energy, proposal.energy)
 
-    updated_q = at.where(do_accept, new_state[0], state[0])
-    updated_p = at.where(do_accept, new_state[1], state[1])
-    updated_potential_energy = at.where(do_accept, new_state[2], state[2])
-    updated_potential_energy_grad = at.where(do_accept, new_state[3], state[3])
-    updated_energy = at.where(do_accept, new_energy, energy)
+    updated_state = IntegratorState(
+        position=updated_q,
+        momentum=updated_p,
+        potential_energy=updated_potential_energy,
+        potential_energy_grad=updated_potential_energy_grad,
+    )
 
-    return (
-        (updated_q, updated_p, updated_potential_energy, updated_potential_energy_grad),
-        updated_energy,
-        updated_weight,
-        updated_log_sum_p_accept,
+    return ProposalState(
+        state=updated_state,
+        energy=updated_energy,
+        weight=updated_weight,
+        sum_log_p_accept=updated_log_sum_p_accept,
     )

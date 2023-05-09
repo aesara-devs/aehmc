@@ -1,9 +1,17 @@
-from typing import Callable, Tuple
+from typing import Callable, NamedTuple, Tuple
 
 import aesara.tensor as at
 import numpy as np
 from aesara import config
 from aesara.tensor.var import TensorVariable
+
+
+class DualAveragingState(NamedTuple):
+    step: TensorVariable
+    iterates: TensorVariable
+    iterates_avg: TensorVariable
+    gradient_avg: TensorVariable
+    shrinkage_pts: TensorVariable
 
 
 def dual_averaging(
@@ -45,12 +53,10 @@ def dual_averaging(
 
     """
 
-    def init(
-        mu: TensorVariable,
-    ) -> Tuple[
-        TensorVariable, TensorVariable, TensorVariable, TensorVariable, TensorVariable
-    ]:
+    def init(mu: TensorVariable) -> DualAveragingState:
         """
+        Initialize dual averaging state using shrinkage points.
+
         Parameters
         ----------
         mu
@@ -61,18 +67,17 @@ def dual_averaging(
         gradient_avg = at.as_tensor(0, "gradient_avg", dtype=config.floatX)
         x_t = at.as_tensor(0.0, "x_t", dtype=config.floatX)
         x_avg = at.as_tensor(0.0, "x_avg", dtype=config.floatX)
-        return step, x_t, x_avg, gradient_avg, mu
+        return DualAveragingState(
+            step=step,
+            iterates=x_t,
+            iterates_avg=x_avg,
+            gradient_avg=gradient_avg,
+            shrinkage_pts=mu,
+        )
 
     def update(
-        gradient: TensorVariable,
-        step: TensorVariable,
-        x: TensorVariable,
-        x_avg: TensorVariable,
-        gradient_avg: TensorVariable,
-        mu: TensorVariable,
-    ) -> Tuple[
-        TensorVariable, TensorVariable, TensorVariable, TensorVariable, TensorVariable
-    ]:
+        gradient: TensorVariable, state: DualAveragingState
+    ) -> DualAveragingState:
         """Update the state of the Dual Averaging algorithm.
 
         Parameters
@@ -96,20 +101,17 @@ def dual_averaging(
 
         """
 
-        eta = 1.0 / (step + t0)
-        new_gradient_avg = (1.0 - eta) * gradient_avg + eta * gradient
+        eta = 1.0 / (state.step + t0)
+        new_gradient_avg = (1.0 - eta) * state.gradient_avg + eta * gradient
+        new_x = state.shrinkage_pts - (at.sqrt(state.step) / gamma) * new_gradient_avg
+        x_eta = state.step ** (-kappa)
+        new_x_avg = x_eta * state.iterates + (1.0 - x_eta) * state.iterates_avg
 
-        new_x = mu - (at.sqrt(step) / gamma) * new_gradient_avg
-
-        x_eta = step ** (-kappa)
-        new_x_avg = x_eta * x + (1.0 - x_eta) * x_avg
-
-        return (
-            (step + 1).astype(np.int64),
-            new_x.astype(config.floatX),
-            new_x_avg.astype(config.floatX),
-            new_gradient_avg.astype(config.floatX),
-            mu,
+        return state._replace(
+            step=(state.step + 1).astype(np.int64),
+            iterates=new_x.astype(config.floatX),
+            iterates_avg=new_x_avg.astype(config.floatX),
+            gradient_avg=new_gradient_avg.astype(config.floatX),
         )
 
     return init, update

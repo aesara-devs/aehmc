@@ -32,13 +32,19 @@ def test_warmup_scalar():
     # mass matrix.
     warmup_fn = aesara.function(
         (y_vv,),
-        (state[0], state[1], state[2], step_size, inverse_mass_matrix),
+        (
+            state.position,
+            state.potential_energy,
+            state.potential_energy_grad,
+            step_size,
+            inverse_mass_matrix,
+        ),
         updates=updates,
     )
 
-    *final_state, step_size, inverse_mass_matrix = warmup_fn(3.0)
+    final_position, *_, step_size, inverse_mass_matrix = warmup_fn(3.0)
 
-    assert final_state[0] != 3.0  # the chain has moved
+    assert final_position != 3.0  # the chain has moved
     assert np.ndim(step_size) == 0  # scalar step size
     assert step_size != 1.0  # step size changed
     assert step_size > 0.1 and step_size < 2  # stable range for the step size
@@ -72,13 +78,19 @@ def test_warmup_vector():
     # mass matrix.
     warmup_fn = aesara.function(
         (y_vv,),
-        (state[0], state[1], state[2], step_size, inverse_mass_matrix),
+        (
+            state.position,
+            state.potential_energy,
+            state.potential_energy_grad,
+            step_size,
+            inverse_mass_matrix,
+        ),
         updates=updates,
     )
 
-    *final_state, step_size, inverse_mass_matrix = warmup_fn([1.0, 1.0])
+    final_position, *_, step_size, inverse_mass_matrix = warmup_fn([1.0, 1.0])
 
-    assert np.all(final_state[0] != np.array([1.0, 1.0]))  # the chain has moved
+    assert np.all(final_position != np.array([1.0, 1.0]))  # the chain has moved
     assert np.ndim(step_size) == 0  # scalar step size
     assert step_size > 0.1 and step_size < 2  # stable range for the step size
     assert np.ndim(inverse_mass_matrix) == 1  # scalar mass matrix
@@ -112,16 +124,24 @@ def test_univariate_hmc(step_size, diverges):
     y_vv = Y_rv.clone()
     initial_state = hmc.new_state(y_vv, logprob_fn)
 
+    def update_hmc_state(pos, energy, energy_grad):
+        current_state = hmc.IntegratorState(pos, None, energy, energy_grad)
+        (new_state, *_), _ = kernel(
+            current_state, step_size, inverse_mass_matrix, num_integration_steps
+        )
+        return (
+            new_state.position,
+            new_state.potential_energy,
+            new_state.potential_energy_grad,
+        )
+
     trajectory, updates = aesara.scan(
-        kernel,
+        update_hmc_state,
         outputs_info=[
-            {"initial": initial_state[0]},
-            {"initial": initial_state[1]},
-            {"initial": initial_state[2]},
-            None,
-            None,
+            {"initial": initial_state.position},
+            {"initial": initial_state.potential_energy},
+            {"initial": initial_state.potential_energy_grad},
         ],
-        non_sequences=(step_size, inverse_mass_matrix, num_integration_steps),
         n_steps=2_000,
     )
 
@@ -200,16 +220,22 @@ def test_hmc_mcse():
     y_vv = Y_rv.clone()
     initial_state = hmc.new_state(y_vv, logprob_fn)
 
+    def update_hmc_state(pos, energy, energy_grad):
+        current_state = hmc.IntegratorState(pos, None, energy, energy_grad)
+        (new_state, *_), _ = kernel(current_state, step_size, inverse_mass_matrix, L)
+        return (
+            new_state.position,
+            new_state.potential_energy,
+            new_state.potential_energy_grad,
+        )
+
     trajectory, updates = aesara.scan(
-        kernel,
+        update_hmc_state,
         outputs_info=[
-            {"initial": initial_state[0]},
-            {"initial": initial_state[1]},
-            {"initial": initial_state[2]},
-            None,
-            None,
+            {"initial": initial_state.position},
+            {"initial": initial_state.potential_energy},
+            {"initial": initial_state.potential_energy_grad},
         ],
-        non_sequences=(step_size, inverse_mass_matrix, L),
         n_steps=3000,
     )
 
@@ -273,9 +299,9 @@ def test_nuts_mcse():
     trajectory, updates = aesara.scan(
         kernel,
         outputs_info=[
-            {"initial": initial_state[0]},
-            {"initial": initial_state[1]},
-            {"initial": initial_state[2]},
+            {"initial": initial_state.position},
+            {"initial": initial_state.potential_energy},
+            {"initial": initial_state.potential_energy_grad},
             None,
             None,
             None,
@@ -289,7 +315,7 @@ def test_nuts_mcse():
 
     rng = np.random.default_rng(seed=0)
     trace = trajectory_generator(rng.standard_normal(2))
-    samples = trace[0][1000:]
+    samples = trace[0][-1000:]
 
     # MCSE on the location
     delta_loc = samples - loc

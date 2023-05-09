@@ -10,11 +10,10 @@ from aesara.tensor.var import TensorVariable
 import aehmc.integrators as integrators
 import aehmc.metrics as metrics
 import aehmc.trajectory as trajectory
+from aehmc.integrators import IntegratorState
 
 
-def new_state(
-    q: TensorVariable, logprob_fn: Callable
-) -> Tuple[TensorVariable, TensorVariable, TensorVariable]:
+def new_state(q: TensorVariable, logprob_fn: Callable) -> IntegratorState:
     """Create a new HMC state from a position.
 
     Parameters
@@ -33,7 +32,12 @@ def new_state(
     """
     potential_energy = -logprob_fn(q)
     potential_energy_grad = aesara.grad(potential_energy, wrt=q)
-    return q, potential_energy, potential_energy_grad
+    return IntegratorState(
+        position=q,
+        momentum=None,
+        potential_energy=potential_energy,
+        potential_energy_grad=potential_energy_grad,
+    )
 
 
 def new_kernel(
@@ -71,16 +75,11 @@ def new_kernel(
         return -logprob_fn(x)
 
     def step(
-        q: TensorVariable,
-        potential_energy: TensorVariable,
-        potential_energy_grad: TensorVariable,
+        state: IntegratorState,
         step_size: TensorVariable,
         inverse_mass_matrix: TensorVariable,
         num_integration_steps: int,
-    ) -> Tuple[
-        Tuple[TensorVariable, TensorVariable, TensorVariable, TensorVariable, bool],
-        Dict,
-    ]:
+    ) -> Tuple[Tuple[IntegratorState, TensorVariable, bool], Dict]:
         """Perform a single step of the HMC algorithm.
 
         Parameters
@@ -120,26 +119,11 @@ def new_kernel(
             num_integration_steps,
             divergence_threshold,
         )
-
-        p = momentum_generator(srng)
-        (
-            q_new,
-            _,
-            potential_energy_new,
-            potential_energy_grad_new,
-            acceptance_probability,
-            is_divergent,
-        ), updates = proposal_generator(
-            srng, q, p, potential_energy, potential_energy_grad, step_size
+        updated_state = state._replace(momentum=momentum_generator(srng))
+        new_state, acceptance_proba, is_divergent, updates = proposal_generator(
+            srng, updated_state, step_size
         )
-
-        return (
-            q_new,
-            potential_energy_new,
-            potential_energy_grad_new,
-            acceptance_probability,
-            is_divergent,
-        ), updates
+        return (new_state, acceptance_proba, is_divergent), updates
 
     return step
 
@@ -173,23 +157,8 @@ def hmc_proposal(
     integrate = trajectory.static_integration(integrator, num_integration_steps)
 
     def propose(
-        srng: RandomStream,
-        q: TensorVariable,
-        p: TensorVariable,
-        potential_energy: TensorVariable,
-        potential_energy_grad: TensorVariable,
-        step_size: TensorVariable,
-    ) -> Tuple[
-        Tuple[
-            TensorVariable,
-            TensorVariable,
-            TensorVariable,
-            TensorVariable,
-            TensorVariable,
-            TensorVariable,
-        ],
-        Dict,
-    ]:
+        srng: RandomStream, state: IntegratorState, step_size: TensorVariable
+    ) -> Tuple[IntegratorState, TensorVariable, bool, Dict]:
         """Use the HMC algorithm to propose a new state.
 
         Parameters
@@ -213,44 +182,20 @@ def hmc_proposal(
         rules for the shared variables updated in the scan operator.
 
         """
-
-        (
-            new_q,
-            new_p,
-            new_potential_energy,
-            new_potential_energy_grad,
-        ), updates = integrate(q, p, potential_energy, potential_energy_grad, step_size)
-
+        new_state, updates = integrate(state, step_size)
         # flip the momentum to keep detailed balance
-        flipped_p = -1.0 * new_p
-
+        new_state = new_state._replace(momentum=-1.0 * new_state.momentum)
         # compute transition-related quantities
-        energy = potential_energy + kinetic_energy(p)
-        new_energy = new_potential_energy + kinetic_energy(flipped_p)
+        energy = state.potential_energy + kinetic_energy(state.momentum)
+        new_energy = new_state.potential_energy + kinetic_energy(new_state.momentum)
         delta_energy = energy - new_energy
         delta_energy = at.where(at.isnan(delta_energy), -np.inf, delta_energy)
         is_transition_divergent = at.abs(delta_energy) > divergence_threshold
 
         p_accept = at.clip(at.exp(delta_energy), 0, 1.0)
         do_accept = srng.bernoulli(p_accept)
-        (
-            final_q,
-            final_p,
-            final_potential_energy,
-            final_potential_energy_grad,
-        ) = ifelse(
-            do_accept,
-            (new_q, flipped_p, new_potential_energy, new_potential_energy_grad),
-            (q, p, potential_energy, potential_energy_grad),
-        )
+        final_state = IntegratorState(*ifelse(do_accept, new_state, state))
 
-        return (
-            final_q,
-            final_p,
-            final_potential_energy,
-            final_potential_energy_grad,
-            p_accept,
-            is_transition_divergent,
-        ), updates
+        return final_state, p_accept, is_transition_divergent, updates
 
     return propose
