@@ -15,12 +15,9 @@ from aehmc.proposals import (
     progressive_uniform_sampling,
     proposal_generator,
 )
+from aehmc.termination import TerminationState
 
 __all__ = ["static_integration", "dynamic_integration", "multiplicative_expansion"]
-
-TerminationStateType = Tuple[
-    TensorVariable, TensorVariable, TensorVariable, TensorVariable
-]
 
 
 # -------------------------------------------------------------------
@@ -157,7 +154,7 @@ def dynamic_integration(
     def integrate(
         previous_last_state: IntegratorState,
         direction: TensorVariable,
-        termination_state: TerminationStateType,
+        termination_state: TerminationState,
         max_num_steps: TensorVariable,
         step_size: TensorVariable,
         initial_energy: TensorVariable,
@@ -215,7 +212,12 @@ def dynamic_integration(
             idx_max,
             trajectory_length,
         ):
-            termination_state = (momentum_ckpts, momentum_sum_ckpts, idx_min, idx_max)
+            termination_state = TerminationState(
+                momentum_checkpoints=momentum_ckpts,
+                momentum_sum_checkpoints=momentum_sum_ckpts,
+                min_index=idx_min,
+                max_index=idx_max,
+            )
             proposal = ProposalState(
                 state=IntegratorState(
                     position=q_proposal,
@@ -261,7 +263,10 @@ def dynamic_integration(
                 new_state.potential_energy,
                 new_state.potential_energy_grad,
                 new_momentum_sum,
-                *new_termination_state,
+                new_termination_state.momentum_checkpoints,
+                new_termination_state.momentum_sum_checkpoints,
+                new_termination_state.min_index,
+                new_termination_state.max_index,
                 trajectory_length + 1,
                 is_diverging,
                 has_terminated,
@@ -290,7 +295,10 @@ def dynamic_integration(
             state.potential_energy,
             state.potential_energy_grad,
             momentum_sum,
-            *termination_state,
+            termination_state.momentum_checkpoints,
+            termination_state.momentum_sum_checkpoints,
+            termination_state.min_index,
+            termination_state.max_index,
             at.as_tensor(1, dtype=np.int64),
             is_diverging,
             np.array(False),
@@ -312,7 +320,10 @@ def dynamic_integration(
                 state.potential_energy,
                 state.potential_energy_grad,
                 momentum_sum,
-                *termination_state,
+                termination_state.momentum_checkpoints,
+                termination_state.momentum_sum_checkpoints,
+                termination_state.min_index,
+                termination_state.max_index,
                 at.as_tensor(1, dtype=np.int64),
                 None,
                 None,
@@ -342,11 +353,11 @@ def dynamic_integration(
             potential_energy_grad=full_state[10],
         )
         subtree_momentum_sum = full_state[11]
-        new_termination_state = (
-            full_state[12],
-            full_state[13],
-            full_state[14],
-            full_state[15],
+        new_termination_state = TerminationState(
+            momentum_checkpoints=full_state[12],
+            momentum_sum_checkpoints=full_state[13],
+            min_index=full_state[14],
+            max_index=full_state[15],
         )
         trajectory_length = full_state[-3]
         is_diverging = full_state[-2]
@@ -402,7 +413,7 @@ def multiplicative_expansion(
         left_state: IntegratorState,
         right_state: IntegratorState,
         momentum_sum,
-        termination_state,
+        termination_state: TerminationState,
         initial_energy,
         step_size,
     ):
@@ -478,11 +489,11 @@ def multiplicative_expansion(
                 weight=weight,
                 sum_log_p_accept=sum_p_accept,
             )
-            termination_state = (
-                momentum_ckpts,
-                momentum_sum_ckpts,
-                idx_min,
-                idx_max,
+            termination_state = TerminationState(
+                momentum_checkpoints=momentum_ckpts,
+                momentum_sum_checkpoints=momentum_sum_ckpts,
+                min_index=idx_min,
+                max_index=idx_max,
             )
 
             do_go_right = srng.bernoulli(0.5)
@@ -566,7 +577,10 @@ def multiplicative_expansion(
                     new_right_state.potential_energy,
                     new_right_state.potential_energy_grad,
                     new_momentum_sum,
-                    *new_termination_state,
+                    new_termination_state.momentum_checkpoints,
+                    new_termination_state.momentum_sum_checkpoints,
+                    new_termination_state.min_index,
+                    new_termination_state.max_index,
                     acceptance_probability,
                     step + 1,
                     is_diverging,

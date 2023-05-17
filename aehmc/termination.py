@@ -1,4 +1,4 @@
-from typing import Callable, Tuple
+from typing import Callable, NamedTuple, Tuple
 
 import aesara
 import aesara.tensor as at
@@ -7,6 +7,13 @@ from aesara import config as config
 from aesara.ifelse import ifelse
 from aesara.scan.utils import until
 from aesara.tensor.var import TensorVariable
+
+
+class TerminationState(NamedTuple):
+    momentum_checkpoints: TensorVariable
+    momentum_sum_checkpoints: TensorVariable
+    min_index: TensorVariable
+    max_index: TensorVariable
 
 
 def iterative_uturn(is_turning_fn: Callable) -> Tuple[Callable, Callable, Callable]:
@@ -35,7 +42,7 @@ def iterative_uturn(is_turning_fn: Callable) -> Tuple[Callable, Callable, Callab
 
     def new_state(
         position: TensorVariable, max_num_doublings: TensorVariable
-    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable, TensorVariable]:
+    ) -> TerminationState:
         """Initialize the termination state
 
         Parameters
@@ -54,27 +61,33 @@ def iterative_uturn(is_turning_fn: Callable) -> Tuple[Callable, Callable, Callab
 
         """
         if position.ndim == 0:
-            return (
-                at.zeros(max_num_doublings, dtype=config.floatX),
-                at.zeros(max_num_doublings, dtype=config.floatX),
-                at.constant(0, dtype=np.int64),
-                at.constant(0, dtype=np.int64),
+            return TerminationState(
+                momentum_checkpoints=at.zeros(max_num_doublings, dtype=config.floatX),
+                momentum_sum_checkpoints=at.zeros(
+                    max_num_doublings, dtype=config.floatX
+                ),
+                min_index=at.constant(0, dtype=np.int64),
+                max_index=at.constant(0, dtype=np.int64),
             )
         else:
             num_dims = position.shape[0]
-            return (
-                at.zeros((max_num_doublings, num_dims), dtype=config.floatX),
-                at.zeros((max_num_doublings, num_dims), dtype=config.floatX),
-                at.constant(0, dtype=np.int64),
-                at.constant(0, dtype=np.int64),
+            return TerminationState(
+                momentum_checkpoints=at.zeros(
+                    (max_num_doublings, num_dims), dtype=config.floatX
+                ),
+                momentum_sum_checkpoints=at.zeros(
+                    (max_num_doublings, num_dims), dtype=config.floatX
+                ),
+                min_index=at.constant(0, dtype=np.int64),
+                max_index=at.constant(0, dtype=np.int64),
             )
 
     def update(
-        state: Tuple,
+        state: TerminationState,
         momentum_sum: TensorVariable,
         momentum: TensorVariable,
         step: TensorVariable,
-    ) -> Tuple[TensorVariable, TensorVariable, TensorVariable, TensorVariable]:
+    ) -> TerminationState:
         """Update the termination state.
 
         Parameters
@@ -93,26 +106,32 @@ def iterative_uturn(is_turning_fn: Callable) -> Tuple[Callable, Callable, Callab
         A tuple that represents the updated termination state.
 
         """
-        momentum_ckpt, momentum_sum_ckpt, *_ = state
         idx_min, idx_max = ifelse(
-            at.eq(step, 0), (state[2], state[3]), _find_storage_indices(step)
+            at.eq(step, 0),
+            (state.min_index, state.max_index),
+            _find_storage_indices(step),
         )
 
         momentum_ckpt = at.where(
             at.eq(step % 2, 0),
-            at.set_subtensor(momentum_ckpt[idx_max], momentum),
-            momentum_ckpt,
+            at.set_subtensor(state.momentum_checkpoints[idx_max], momentum),
+            state.momentum_checkpoints,
         )
         momentum_sum_ckpt = at.where(
             at.eq(step % 2, 0),
-            at.set_subtensor(momentum_sum_ckpt[idx_max], momentum_sum),
-            momentum_sum_ckpt,
+            at.set_subtensor(state.momentum_sum_checkpoints[idx_max], momentum_sum),
+            state.momentum_sum_checkpoints,
         )
 
-        return (momentum_ckpt, momentum_sum_ckpt, idx_min, idx_max)
+        return TerminationState(
+            momentum_checkpoints=momentum_ckpt,
+            momentum_sum_checkpoints=momentum_sum_ckpt,
+            min_index=idx_min,
+            max_index=idx_max,
+        )
 
     def is_iterative_turning(
-        state: Tuple, momentum_sum: TensorVariable, momentum: TensorVariable
+        state: TerminationState, momentum_sum: TensorVariable, momentum: TensorVariable
     ) -> bool:
         """Check if any sub-trajectory is making a U-turn.
 
@@ -141,24 +160,28 @@ def iterative_uturn(is_turning_fn: Callable) -> Tuple[Callable, Callable, Callab
         True if any sub-trajectory makes a U-turn, False otherwise.
 
         """
-        momentum_ckpts, momentum_sum_ckpts, idx_min, idx_max = state
 
         def body_fn(i):
             subtree_momentum_sum = (
-                momentum_sum - momentum_sum_ckpts[i] + momentum_ckpts[i]
+                momentum_sum
+                - state.momentum_sum_checkpoints[i]
+                + state.momentum_checkpoints[i]
             )
             is_turning = is_turning_fn(
-                momentum_ckpts[i], momentum, subtree_momentum_sum
+                state.momentum_checkpoints[i], momentum, subtree_momentum_sum
             )
-            reached_max_iteration = at.lt(i - 1, idx_min)
+            reached_max_iteration = at.lt(i - 1, state.min_index)
             do_stop = at.any(is_turning | reached_max_iteration)
             return (i - 1, is_turning), until(do_stop)
 
-        val, _ = aesara.scan(body_fn, outputs_info=(idx_max, None), n_steps=idx_max + 2)
+        (_, criterion), _ = aesara.scan(
+            body_fn, outputs_info=(state.max_index, None), n_steps=state.max_index + 2
+        )
 
-        is_turning = val[1][-1]
         is_turning = at.where(
-            at.lt(idx_max, idx_min), at.as_tensor(0, dtype="bool"), is_turning
+            at.lt(state.max_index, state.min_index),
+            at.as_tensor(0, dtype="bool"),
+            criterion[-1],
         )
 
         return is_turning

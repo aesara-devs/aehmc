@@ -113,7 +113,12 @@ def new_kernel(
         )
 
         p = momentum_generator(srng)
-        initial_state = IntegratorState(q, p, potential_energy, potential_energy_grad)
+        initial_state = IntegratorState(
+            position=q,
+            momentum=p,
+            potential_energy=potential_energy,
+            potential_energy_grad=potential_energy_grad,
+        )
         initial_termination_state = new_termination_state(q, max_num_expansions)
         initial_energy = potential_energy + kinetic_energy_fn(p)
         initial_proposal = ProposalState(

@@ -6,7 +6,7 @@ import pytest
 from numpy.testing import assert_array_equal
 
 from aehmc.metrics import gaussian_metric
-from aehmc.termination import _find_storage_indices, iterative_uturn
+from aehmc.termination import TerminationState, _find_storage_indices, iterative_uturn
 
 
 @pytest.mark.parametrize(
@@ -31,7 +31,12 @@ def test_iterative_turning_termination(
     idx_max = at.as_tensor(idx_max)
     momentum_ckpts = at.as_tensor(np.array([1.0, 2.0, 3.0, -2.0]))
     momentum_sum_ckpts = at.as_tensor(np.array([2.0, 4.0, 4.0, -1.0]))
-    ckpt_state = (momentum_ckpts, momentum_sum_ckpts, idx_min, idx_max)
+    ckpt_state = TerminationState(
+        momentum_checkpoints=momentum_ckpts,
+        momentum_sum_checkpoints=momentum_sum_ckpts,
+        min_index=idx_min,
+        max_index=idx_max,
+    )
 
     _, _, is_iterative_turning_fn = iterative_uturn(is_turning)
     is_iterative_turning = is_iterative_turning_fn(ckpt_state, momentum_sum, momentum)
