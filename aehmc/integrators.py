@@ -16,8 +16,12 @@ def new_integrator_state(
 ) -> IntegratorState:
     """Create a new integrator state from the current values of the position and momentum."""
     potential_energy = potential_fn(position)
-    potential_energy_grad = aesara.grad(potential_energy, position)
-    return IntegratorState(position, momentum, potential_energy, potential_energy_grad)
+    return IntegratorState(
+        position=position,
+        momentum=momentum,
+        potential_energy=potential_energy,
+        potential_energy_grad=aesara.grad(potential_energy, position),
+    )
 
 
 def velocity_verlet(
