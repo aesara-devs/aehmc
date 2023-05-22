@@ -35,8 +35,13 @@ def test_dual_averaging_adaptation(init):
     da_state = init_fn(init_stepsize)
 
     def one_step(q, logprob, logprob_grad, step, x_t, x_avg, gradient_avg, mu):
-        state = hmc.IntegratorState(q, None, logprob, logprob_grad)
-        (state, p_accept, _), inner_updates = kernel(
+        state = hmc.IntegratorState(
+            position=q,
+            momentum=None,
+            potential_energy=logprob,
+            potential_energy_grad=logprob_grad,
+        )
+        chain_info, inner_updates = kernel(
             state, at.exp(x_t), inverse_mass_matrix, num_integration_steps
         )
         current_da_state = DualAveragingState(
@@ -46,18 +51,18 @@ def test_dual_averaging_adaptation(init):
             gradient_avg=gradient_avg,
             shrinkage_pts=mu,
         )
-        da_state = update_fn(p_accept, current_da_state)
+        da_state = update_fn(chain_info.acceptance_probability, current_da_state)
 
         return (
-            state.position,
-            state.potential_energy,
-            state.potential_energy_grad,
+            chain_info.state.position,
+            chain_info.state.potential_energy,
+            chain_info.state.potential_energy_grad,
             da_state.step,
             da_state.iterates,
             da_state.iterates_avg,
             da_state.gradient_avg,
             da_state.shrinkage_pts,
-            p_accept,
+            chain_info.acceptance_probability,
         ), inner_updates
 
     states, updates = aesara.scan(

@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Dict, Tuple
 
 import aesara.tensor as at
 import numpy as np
@@ -9,7 +9,7 @@ from aehmc import hmc, integrators, metrics
 from aehmc.integrators import IntegratorState
 from aehmc.proposals import ProposalState
 from aehmc.termination import iterative_uturn
-from aehmc.trajectory import dynamic_integration, multiplicative_expansion
+from aehmc.trajectory import Diagnostics, dynamic_integration, multiplicative_expansion
 
 new_state = hmc.new_state
 
@@ -54,12 +54,10 @@ def new_kernel(
         return -logprob_fn(x)
 
     def step(
-        q: TensorVariable,
-        potential_energy: TensorVariable,
-        potential_energy_grad: TensorVariable,
+        state: IntegratorState,
         step_size: TensorVariable,
         inverse_mass_matrix: TensorVariable,
-    ):
+    ) -> Tuple[Diagnostics, Dict]:
         """Use the NUTS algorithm to propose a new state.
 
         Parameters
@@ -112,50 +110,46 @@ def new_kernel(
             max_num_expansions,
         )
 
-        p = momentum_generator(srng)
-        initial_state = IntegratorState(
-            position=q,
-            momentum=p,
-            potential_energy=potential_energy,
-            potential_energy_grad=potential_energy_grad,
+        initial_state = state._replace(momentum=momentum_generator(srng))
+        initial_termination_state = new_termination_state(
+            initial_state.position, max_num_expansions
         )
-        initial_termination_state = new_termination_state(q, max_num_expansions)
-        initial_energy = potential_energy + kinetic_energy_fn(p)
+        initial_energy = initial_state.potential_energy + kinetic_energy_fn(
+            initial_state.momentum
+        )
         initial_proposal = ProposalState(
             state=initial_state,
             energy=initial_energy,
             weight=at.as_tensor(0.0, dtype=np.float64),
             sum_log_p_accept=at.as_tensor(-np.inf, dtype=np.float64),
         )
-        result, updates = expand(
+
+        results, updates = expand(
             initial_proposal,
             initial_state,
             initial_state,
-            p,
+            initial_state.momentum,
             initial_termination_state,
             initial_energy,
             step_size,
         )
 
-        # New MCMC proposal
-        q_new = result[0][-1]
-        potential_energy_new = result[2][-1]
-        potential_energy_grad_new = result[3][-1]
+        # extract the last iteration from multiplicative_expansion chain diagnostics
+        chain_info = Diagnostics(
+            state=IntegratorState(
+                position=results.diagnostics.state.position[-1],
+                momentum=results.diagnostics.state.momentum[-1],
+                potential_energy=results.diagnostics.state.potential_energy[-1],
+                potential_energy_grad=results.diagnostics.state.potential_energy_grad[
+                    -1
+                ],
+            ),
+            acceptance_probability=results.diagnostics.acceptance_probability[-1],
+            num_doublings=results.diagnostics.num_doublings[-1],
+            is_turning=results.diagnostics.is_turning[-1],
+            is_diverging=results.diagnostics.is_diverging[-1],
+        )
 
-        # Diagnostics
-        is_turning = result[-1][-1]
-        is_diverging = result[-2][-1]
-        num_doublings = result[-3][-1]
-        acceptance_probability = result[-4][-1]
-
-        return (
-            q_new,
-            potential_energy_new,
-            potential_energy_grad_new,
-            acceptance_probability,
-            num_doublings,
-            is_turning,
-            is_diverging,
-        ), updates
+        return chain_info, updates
 
     return step

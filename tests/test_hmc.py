@@ -126,13 +126,13 @@ def test_univariate_hmc(step_size, diverges):
 
     def update_hmc_state(pos, energy, energy_grad):
         current_state = hmc.IntegratorState(pos, None, energy, energy_grad)
-        (new_state, *_), _ = kernel(
+        chain_info, _ = kernel(
             current_state, step_size, inverse_mass_matrix, num_integration_steps
         )
         return (
-            new_state.position,
-            new_state.potential_energy,
-            new_state.potential_energy_grad,
+            chain_info.state.position,
+            chain_info.state.potential_energy,
+            chain_info.state.potential_energy_grad,
         )
 
     trajectory, updates = aesara.scan(
@@ -222,11 +222,11 @@ def test_hmc_mcse():
 
     def update_hmc_state(pos, energy, energy_grad):
         current_state = hmc.IntegratorState(pos, None, energy, energy_grad)
-        (new_state, *_), _ = kernel(current_state, step_size, inverse_mass_matrix, L)
+        chain_info, _ = kernel(current_state, step_size, inverse_mass_matrix, L)
         return (
-            new_state.position,
-            new_state.potential_energy,
-            new_state.potential_energy_grad,
+            chain_info.state.position,
+            chain_info.state.potential_energy,
+            chain_info.state.potential_energy_grad,
         )
 
     trajectory, updates = aesara.scan(
@@ -293,21 +293,31 @@ def test_nuts_mcse():
     inverse_mass_matrix = at.as_tensor(scale)
     kernel = nuts.new_kernel(srng, logprob_fn)
 
+    def wrapped_kernel(pos, energy, energy_grad):
+        state = nuts.IntegratorState(
+            position=pos,
+            momentum=None,
+            potential_energy=energy,
+            potential_energy_grad=energy_grad,
+        )
+        chain_info, updates = kernel(state, step_size, inverse_mass_matrix)
+
+        return (
+            chain_info.state.position,
+            chain_info.state.potential_energy,
+            chain_info.state.potential_energy_grad,
+        ), updates
+
     y_vv = Y_rv.clone()
     initial_state = nuts.new_state(y_vv, logprob_fn)
 
     trajectory, updates = aesara.scan(
-        kernel,
+        wrapped_kernel,
         outputs_info=[
             {"initial": initial_state.position},
             {"initial": initial_state.potential_energy},
             {"initial": initial_state.potential_energy_grad},
-            None,
-            None,
-            None,
-            None,
         ],
-        non_sequences=(step_size, inverse_mass_matrix),
         n_steps=3000,
     )
 

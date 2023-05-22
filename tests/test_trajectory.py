@@ -195,12 +195,13 @@ def test_multiplicative_expansion(
     result, updates = expand(
         proposal, state, state, state.momentum, termination_state, energy, step_size
     )
-    fn = aesara.function((), result, updates=updates)
-    result = fn()
-
-    num_doublings = result[-3][-1]
-    does_diverge = result[-2][-1]
-    does_turn = result[-1][-1]
+    outputs = (
+        result.diagnostics.num_doublings[-1],
+        result.diagnostics.is_diverging[-1],
+        result.diagnostics.is_turning[-1],
+    )
+    fn = aesara.function((), outputs, updates=updates)
+    num_doublings, does_diverge, does_turn = fn()
 
     assert does_diverge == should_diverge
     assert does_turn == should_turn
