@@ -79,7 +79,7 @@ def new_kernel(
         step_size: TensorVariable,
         inverse_mass_matrix: TensorVariable,
         num_integration_steps: int,
-    ) -> Tuple[Tuple[IntegratorState, TensorVariable, bool], Dict]:
+    ) -> Tuple[trajectory.Diagnostics, Dict]:
         """Perform a single step of the HMC algorithm.
 
         Parameters
@@ -120,10 +120,8 @@ def new_kernel(
             divergence_threshold,
         )
         updated_state = state._replace(momentum=momentum_generator(srng))
-        new_state, acceptance_proba, is_divergent, updates = proposal_generator(
-            srng, updated_state, step_size
-        )
-        return (new_state, acceptance_proba, is_divergent), updates
+        chain_info, updates = proposal_generator(srng, updated_state, step_size)
+        return chain_info, updates
 
     return step
 
@@ -158,7 +156,7 @@ def hmc_proposal(
 
     def propose(
         srng: RandomStream, state: IntegratorState, step_size: TensorVariable
-    ) -> Tuple[IntegratorState, TensorVariable, bool, Dict]:
+    ) -> Tuple[trajectory.Diagnostics, Dict]:
         """Use the HMC algorithm to propose a new state.
 
         Parameters
@@ -195,7 +193,14 @@ def hmc_proposal(
         p_accept = at.clip(at.exp(delta_energy), 0, 1.0)
         do_accept = srng.bernoulli(p_accept)
         final_state = IntegratorState(*ifelse(do_accept, new_state, state))
+        chain_info = trajectory.Diagnostics(
+            state=final_state,
+            acceptance_probability=p_accept,
+            is_diverging=is_transition_divergent,
+            num_doublings=None,
+            is_turning=None,
+        )
 
-        return final_state, p_accept, is_transition_divergent, updates
+        return chain_info, updates
 
     return propose

@@ -10,6 +10,7 @@ from aesara.tensor.var import TensorVariable
 from aehmc.algorithms import DualAveragingState
 from aehmc.integrators import IntegratorState
 from aehmc.mass_matrix import covariance_adaptation
+from aehmc.nuts import Diagnostics
 from aehmc.step_size import dual_averaging_adaptation
 
 
@@ -42,7 +43,13 @@ def run(
         step_size,  # parameters
         inverse_mass_matrix,
     ):
-        chain_state = (q, potential_energy, potential_energy_grad)
+        chain_state = IntegratorState(
+            position=q,
+            momentum=None,
+            potential_energy=potential_energy,
+            potential_energy_grad=potential_energy_grad,
+        )
+
         warmup_state = (
             DualAveragingState(
                 step=step,
@@ -56,17 +63,17 @@ def run(
         parameters = (step_size, inverse_mass_matrix)
 
         # Advance the chain by one step
-        chain_state, inner_updates = kernel(*chain_state, *parameters)
+        chain_info, inner_updates = kernel(chain_state, *parameters)
 
         # Update the warmup state and parameters
         warmup_state, parameters = update_adapt(
-            warmup_step, warmup_state, parameters, chain_state
+            warmup_step, warmup_state, parameters, chain_info
         )
         da_state = warmup_state[0]
         return (
-            chain_state[0],  # q
-            chain_state[1],  # potential_energy
-            chain_state[2],  # potential_energy_grad
+            chain_info.state.position,  # q
+            chain_info.state.potential_energy,  # potential_energy
+            chain_info.state.potential_energy_grad,  # potential_energy_grad
             da_state.step,
             da_state.iterates,  # log_step_size
             da_state.iterates_avg,  # log_step_size_avg
@@ -182,14 +189,19 @@ def window_adaptation(
         step_size = at.exp(da_state.iterates_avg)  # return stepsize_avg at the end
         return step_size, inverse_mass_matrix
 
-    def update(step: int, warmup_state: Tuple, parameters: Tuple, chain_state: Tuple):
-        position, _, _, p_accept, *_ = chain_state
-
+    def update(
+        step: int, warmup_state: Tuple, parameters: Tuple, chain_state: Diagnostics
+    ):
         stage = schedule_stage[step]
         warmup_state, parameters = where_warmup_state(
             at.eq(stage, 0),
-            fast_update(p_accept, warmup_state, parameters),
-            slow_update(position, p_accept, warmup_state, parameters),
+            fast_update(chain_state.acceptance_probability, warmup_state, parameters),
+            slow_update(
+                chain_state.state.position,
+                chain_state.acceptance_probability,
+                warmup_state,
+                parameters,
+            ),
         )
 
         is_middle_window_end = schedule_middle_window[step]

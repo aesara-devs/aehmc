@@ -1,4 +1,4 @@
-from typing import Callable, Dict, Tuple
+from typing import Callable, Dict, NamedTuple, Tuple
 
 import aesara
 import aesara.tensor as at
@@ -376,6 +376,23 @@ def dynamic_integration(
     return integrate
 
 
+class Diagnostics(NamedTuple):
+    state: IntegratorState
+    acceptance_probability: TensorVariable
+    num_doublings: TensorVariable
+    is_turning: TensorVariable
+    is_diverging: TensorVariable
+
+
+class MultiplicativeExpansionResult(NamedTuple):
+    proposals: ProposalState
+    right_states: IntegratorState
+    left_states: IntegratorState
+    momentum_sums: TensorVariable
+    termination_states: TerminationState
+    diagnostics: Diagnostics
+
+
 def multiplicative_expansion(
     srng: RandomStream,
     trajectory_integrator: Callable,
@@ -416,7 +433,7 @@ def multiplicative_expansion(
         termination_state: TerminationState,
         initial_energy,
         step_size,
-    ):
+    ) -> Tuple[MultiplicativeExpansionResult, Dict]:
         """Expand the current trajectory multiplicatively.
 
         At each step we draw a direction at random, build a subtrajectory starting
@@ -465,7 +482,7 @@ def multiplicative_expansion(
             momentum_sum_ckpts,
             idx_min,
             idx_max,
-        ):
+        ) -> Tuple[Tuple[TensorVariable, ...], Dict, until]:
             left_state = (
                 q_left,
                 p_left,
@@ -591,7 +608,33 @@ def multiplicative_expansion(
             )
 
         expansion_steps = at.arange(0, max_num_expansions)
-        results, updates = aesara.scan(
+        # results, updates = aesara.scan(
+        (
+            proposal_state_position,
+            proposal_state_momentum,
+            proposal_state_potential_energy,
+            proposal_state_potential_energy_grad,
+            proposal_energy,
+            proposal_weight,
+            proposal_sum_log_p_accept,
+            left_state_position,
+            left_state_momentum,
+            left_state_potential_energy,
+            left_state_potential_energy_grad,
+            right_state_position,
+            right_state_momentum,
+            right_state_potential_energy,
+            right_state_potential_energy_grad,
+            momentum_sum,
+            momentum_checkpoints,
+            momentum_sum_checkpoints,
+            min_indices,
+            max_indices,
+            acceptance_probability,
+            num_doublings,
+            is_diverging,
+            is_turning,
+        ), updates = aesara.scan(
             expand_once,
             outputs_info=(
                 proposal.state.position,
@@ -610,7 +653,10 @@ def multiplicative_expansion(
                 right_state.potential_energy,
                 right_state.potential_energy_grad,
                 momentum_sum,
-                *termination_state,
+                termination_state.momentum_checkpoints,
+                termination_state.momentum_sum_checkpoints,
+                termination_state.min_index,
+                termination_state.max_index,
                 None,
                 None,
                 None,
@@ -618,8 +664,52 @@ def multiplicative_expansion(
             ),
             sequences=expansion_steps,
         )
-
-        return results, updates
+        # Ensure each item of the returned result sequence is packed into the appropriate namedtuples.
+        typed_result = MultiplicativeExpansionResult(
+            proposals=ProposalState(
+                state=IntegratorState(
+                    position=proposal_state_position,
+                    momentum=proposal_state_momentum,
+                    potential_energy=proposal_state_potential_energy,
+                    potential_energy_grad=proposal_state_potential_energy_grad,
+                ),
+                energy=proposal_energy,
+                weight=proposal_weight,
+                sum_log_p_accept=proposal_sum_log_p_accept,
+            ),
+            left_states=IntegratorState(
+                position=left_state_position,
+                momentum=left_state_momentum,
+                potential_energy=left_state_potential_energy,
+                potential_energy_grad=left_state_potential_energy_grad,
+            ),
+            right_states=IntegratorState(
+                position=right_state_position,
+                momentum=right_state_momentum,
+                potential_energy=right_state_potential_energy,
+                potential_energy_grad=right_state_potential_energy_grad,
+            ),
+            momentum_sums=momentum_sum,
+            termination_states=TerminationState(
+                momentum_checkpoints=momentum_checkpoints,
+                momentum_sum_checkpoints=momentum_sum_checkpoints,
+                min_index=min_indices,
+                max_index=max_indices,
+            ),
+            diagnostics=Diagnostics(
+                state=IntegratorState(
+                    position=proposal_state_position,
+                    momentum=proposal_state_momentum,
+                    potential_energy=proposal_state_potential_energy,
+                    potential_energy_grad=proposal_state_potential_energy_grad,
+                ),
+                acceptance_probability=acceptance_probability,
+                num_doublings=num_doublings,
+                is_turning=is_turning,
+                is_diverging=is_diverging,
+            ),
+        )
+        return typed_result, updates
 
     return expand
 
